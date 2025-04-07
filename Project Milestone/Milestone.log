@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.27 (TeX Live 2025) (preloaded format=pdflatex 2025.4.7)  7 APR 2025 12:02
+This is pdfTeX, Version 3.141592653-2.6-1.40.27 (TeX Live 2025) (preloaded format=pdflatex 2025.4.7)  7 APR 2025 12:17
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -136,11 +136,18 @@ LaTeX Font Info:    External font `cmex10' loaded for size
 (Font)              <8> on input line 13.
 LaTeX Font Info:    External font `cmex10' loaded for size
 (Font)              <6> on input line 13.
+
+Underfull \hbox (badness 1424) in paragraph at lines 25--26
+[]\OT1/cmr/m/n/10 Finalize task board and project man-age-ment
+ []
+
 [1
 
 {/usr/local/texlive/2025basic/texmf-var/fonts/map/pdftex/updmap/pdftex.map}]
 
-[2] (./Milestone.aux)
+[2]
+
+[3] (./Milestone.aux)
  ***********
 LaTeX2e <2024-11-01> patch level 2
 L3 programming layer <2025-01-18>
@@ -149,7 +156,7 @@ L3 programming layer <2025-01-18>
 Here is how much of TeX's memory you used:
  1213 strings out of 474662
  20514 string characters out of 5751110
- 431031 words of memory out of 5000000
+ 432031 words of memory out of 5000000
  24301 multiletter control sequences out of 15000+600000
  563427 words of font info for 51 fonts, out of 8000000 for 9000
  319 hyphenation exceptions out of 8191
@@ -161,10 +168,10 @@ s/type1/public/amsfonts/cm/cmbx12.pfb></usr/local/texlive/2025basic/texmf-dist/
 fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/local/texlive/2025basic/texmf-di
 st/fonts/type1/public/amsfonts/cm/cmr12.pfb></usr/local/texlive/2025basic/texmf
 -dist/fonts/type1/public/amsfonts/cm/cmr17.pfb>
-Output written on Milestone.pdf (2 pages, 76810 bytes).
+Output written on Milestone.pdf (3 pages, 79656 bytes).
 PDF statistics:
- 41 PDF objects out of 1000 (max. 8388607)
- 25 compressed objects within 1 object stream
+ 44 PDF objects out of 1000 (max. 8388607)
+ 27 compressed objects within 1 object stream
  0 named destinations out of 1000 (max. 500000)
  1 words of extra memory for PDF output out of 10000 (max. 10000000)
 
