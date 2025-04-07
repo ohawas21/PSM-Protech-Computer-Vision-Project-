@@ -22,89 +22,98 @@ Week 1 & April 7 -- April 13, 2025 &
 \begin{itemize}
     \item Set up the project repository.
     \item Define folder structure and annotation format.
-    \item Finalize task board and management workflow.
+    \item Finalize task board and project management workflow.
     \item Conduct kickoff meeting to align goals and responsibilities.
 \end{itemize} \\
 \hline
 Week 2 & April 14 -- April 20, 2025 &
 \begin{itemize}
-    \item Begin Phase 1 annotation on original images for Model 1.
-    \item Set up the initial YOLO model environment and configurations.
+    \item Begin Phase 1 annotation on original images for Model 1 (YOLO).
+    \item Set up initial YOLO environment and baseline configuration.
 \end{itemize} \\
 \hline
 Week 3 & April 21 -- April 27, 2025 &
 \begin{itemize}
     \item Continue Phase 1 annotation.
-    \item Begin training Model 1 (YOLO) using partially annotated data.
+    \item Train Model 1 (YOLO) with partial annotated data.
 \end{itemize} \\
 \hline
 Week 4 & April 28 -- May 4, 2025 &
 \begin{itemize}
-    \item Finalize Phase 1 annotation.
-    \item Complete training of YOLO (Model 1).
-    \item Export bounding boxes and generate cropped outputs.
+    \item Finalize YOLO training and bounding box outputs.
+    \item Generate cropped outputs from detected regions.
 \end{itemize} \\
 \hline
 Week 5 & May 5 -- May 11, 2025 &
 \begin{itemize}
-    \item Start Phase 2 annotation using cropped images.
-    \item Begin development of Model 2 (OCR + classification).
+    \item Start Phase 2 annotation on cropped regions for symbol classification.
+    \item Begin training Model 2 to classify domain-specific symbols.
 \end{itemize} \\
 \hline
 Week 6 & May 12 -- May 18, 2025 &
 \begin{itemize}
-    \item Continue Phase 2 annotation.
-    \item Begin training Model 2 using labeled OCR data.
+    \item Continue symbol classification annotation.
+    \item Improve Model 2 accuracy and finalize training.
 \end{itemize} \\
 \hline
 Week 7 & May 19 -- May 25, 2025 &
 \begin{itemize}
-    \item Continue Model 2 training and tuning.
-    \item Start development of Model 3 (rule-based logic and formula calculations).
+    \item Begin Phase 3 OCR annotation on cropped image regions.
+    \item Train Model 3 for text and ID extraction.
 \end{itemize} \\
 \hline
 Week 8 & May 26 -- June 1, 2025 &
 \begin{itemize}
-    \item Finalize Model 3 logic and perform rule validation.
-    \item Integrate Excel/CSV export pipeline.
+    \item Finalize OCR model (Model 3) and test integration with symbol output.
+    \item Begin rule and formula development for feasibility calculations.
 \end{itemize} \\
 \hline
 Week 9 & June 2 -- June 8, 2025 &
 \begin{itemize}
-    \item Integrate Model 1, Model 2, and Model 3 into a unified pipeline.
-    \item Conduct end-to-end testing and debugging.
+    \item Integrate all models (YOLO, symbol, OCR, calculation).
+    \item Develop Flask frontend interface.
+    \item Set up Docker environment for deployment.
 \end{itemize} \\
 \hline
 Week 10 & June 9 -- June 15, 2025 &
 \begin{itemize}
-    \item Perform final QA and validation.
-    \item Prepare project presentation and documentation.
-    \item Submit the complete project deliverables.
+    \item Final QA for pipeline and frontend.
+    \item Deploy complete application using Docker.
+    \item Validate calculations and usability through interface.
+    \item Submit project presentation and deliverables.
 \end{itemize} \\
 \hline
 \end{longtable}
 
-\section*{Annotation Process Details}
+\section*{Annotation and Model Workflow}
 
-\subsection*{Phase 1: Annotation for Model 1}
+\subsection*{Model 1: Object Detection (YOLO)}
 \begin{itemize}
-    \item Annotate 300--400 original images with bounding boxes.
-    \item These annotations are used to train Model 1 (YOLO) for object detection.
-    \item The bounding box outputs are later used to crop regions of interest for further processing.
+    \item Annotate 300--400 images for key object regions.
+    \item Train YOLO model to detect target zones from input images.
+    \item Output includes bounding boxes used for further processing.
 \end{itemize}
 
-\subsection*{Phase 2: Annotation for Model 2}
+\subsection*{Model 2: Symbol Classification}
 \begin{itemize}
-    \item Annotate cropped images generated from Model 1’s output.
-    \item Focus on labeling text elements, symbols, and structured fields.
-    \item Assign classification tags (e.g., ID, label, value) to the annotated components.
+    \item Use YOLO output to crop relevant zones.
+    \item Annotate and classify symbols (arrows, signs, icons, etc.).
+    \item Train a symbol classification model to label cropped regions.
 \end{itemize}
 
-\subsection*{Phase 3: Rule-Based Processing (Model 3)}
+\subsection*{Model 3: OCR (Text Recognition)}
 \begin{itemize}
-    \item Pass the classified outputs from Model 2 into a rule-based engine.
-    \item Apply logical formulas to perform computations, content validation, or formatting.
-    \item Export the final structured results to Excel or CSV files.
+    \item Annotate cropped zones for text extraction.
+    \item Train OCR model to extract IDs, codes, or structured text.
+    \item Combine outputs with symbol classifications.
+\end{itemize}
+
+\subsection*{Model 4: Rule-Based Feasibility Analysis}
+\begin{itemize}
+    \item Use outputs from previous models as input.
+    \item Apply domain-specific formulas and rule logic.
+    \item Derive feasibility values and interpretations.
+    \item Export results to Excel/CSV reports.
 \end{itemize}
 
 \end{document}
