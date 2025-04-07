@@ -1,8 +1,13 @@
-# Yolo 
-# Team
-Ahmed Alyan Roshan
-Alina Roshan
-Mohammed Areeb Khan
-Mugesh Vaikundamani
-Omar Hawas
-Shaheryaar Zia
+# PSM-Protech Feasibility Study
+
+
+## 📄 Description of Milestone
+
+The project outlines a 10-week AI model pipeline development workflow, including:
+- Image annotation (Object detection & OCR)
+- Model training (YOLO , Classfication, OCR, Rule-based)
+- Data extraction and transformation
+- Export to Excel/CSV
+
+The report includes timelines, milestones, and annotation processes.
+
