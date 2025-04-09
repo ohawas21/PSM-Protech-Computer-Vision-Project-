@@ -1,15 +1,20 @@
-PSM-Protech Feasibility project
+# 🤖 PSM-Protech Feasibility Project
 
-📄 Description of Milestone
+📄 **Description of Milestone**
 
-The project outlines a 10-week AI model pipeline development workflow, including:
-- Image annotation (Object detection & OCR)
-- Model training (YOLO , Classfication, OCR, Rule-based)
-- Data extraction and transformation
-- Export to Excel/CSV
+This project outlines a 10-week AI model pipeline development workflow, including:
 
-The report includes timelines, milestones, and annotation processes...
+- 🏷️ Image Annotation (Object Detection & OCR)
+- 🧠 Model Training (YOLO, Classification, OCR, Rule-Based)
+- 📊 Data Extraction and Transformation
+- 📤 Exporting Results to Excel/CSV
 
-For more information please navigate to [our Wiki](https://git-ce.th-rosenheim.de/pse-aai-25/PSM-Protech-Feasibility-Study/-/wikis/Home)
+The report includes detailed timelines, milestones, and annotation processes necessary to build a robust and modular deep learning pipeline.
 
-Please Nagivate to [our Wiki] (https://git-ce.th-rosenheim.de/pse-aai-25/PSM-Protech-Feasibility-Study/-/wikis/Home/pipelie)
+---
+
+📚 **For more information:**
+
+- Please navigate to [our Wiki](https://git-ce.th-rosenheim.de/pse-aai-25/PSM-Protech-Feasibility-Study/-/wikis/Home) for general documentation.
+
+- To view the complete pipeline diagram and model breakdown, go to the [Pipeline Architecture page](https://git-ce.th-rosenheim.de/pse-aai-25/PSM-Protech-Feasibility-Study/-/wikis/Home/PipelineArchitecture).
