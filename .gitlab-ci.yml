@@ -18,12 +18,12 @@ build:
   image: danteev/texlive
   stage: build
   script:
-    - cd ./"Project Milestone"/
+    - cd ./"Project Milestone"
     - latexmk -pdf Milestone.tex
   artifacts:
     paths:
-      - ./"Project Milestone"/Milestone.pdf
+      - ./"Project Milestone"/*.pdf
   artifacts:
     paths:
-      - ./"Project Milestone"/Milestone.pdf
+      - ./"Project Milestone"/*.pdf
     expire_in: 1 week
