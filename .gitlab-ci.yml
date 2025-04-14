@@ -1,25 +1,25 @@
 stages:
-  - prepare
+#  - prepare
   - build
 
-prepare:
-  image: eclipse-temurin:21-jdk
-  stage: prepare
-  allow_failure: true
-  script:
-    - apt-get update
-    - apt-get install graphviz -y
-    - java -jar ./doc/bin/plantuml-1.2025.0.jar -tpng ./doc/projectreport/figures/*.puml
-  artifacts:
-    paths:
-      - ./doc/projectreport/figures/*.png
+#prepare:
+#  image: eclipse-temurin:21-jdk
+#  stage: prepare
+#  allow_failure: true
+#  script:
+#    - apt-get update
+#    - apt-get install graphviz -y
+#    - java -jar ./doc/bin/plantuml-1.2025.0.jar -tpng ./doc/projectreport/figures/*.puml
+#  artifacts:
+#    paths:
+#      - ./doc/projectreport/figures/*.png
 
 build:
   image: danteev/texlive
   stage: build
   script:
     - cd "./Documentation"
-    - latexmk -pdf Milestone.tex
+    - for file in *.tex; do latexmk -pdf "$file"; done
   artifacts:
     paths:
       - "./Documentation/*.pdf"
