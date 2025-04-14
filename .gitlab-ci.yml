@@ -3,31 +3,26 @@ stages:
   - build
 
 prepare:
-  image: python:3.12
+  image: eclipse-temurin:21-jdk
   stage: prepare
   script:
-    # Update package lists and install Java (for running PlantUML) and Graphviz
-    - apt-get update && apt-get install -y openjdk-11-jre graphviz
-    # Install Python dependencies
-    - pip install -r requirements.txt
-    # Generate diagrams using PlantUML jar (assumes the jar is located in ./doc/bin/)
+    - apt-get update
+    - apt-get install graphviz -y
     - java -jar ./doc/bin/plantuml-1.2025.0.jar -tpng ./doc/projectreport/figures/*.puml
   artifacts:
     paths:
       - ./doc/projectreport/figures/*.png
 
 build:
-  image: python:3.12
+  image: danteev/texlive
   stage: build
   script:
-    # Install Python dependencies (if not cached from previous stage)
-    - pip install -r requirements.txt
-    # Run unit tests with pytest
-    - pytest --maxfail=1 --disable-warnings -q
-    # Build the package: source and wheel distributions (adjust setup.py as needed)
-    - python setup.py sdist bdist_wheel
+    - cd ./doc/projectreport
+    - latexmk -pdf projectreport.tex
   artifacts:
     paths:
-      - dist/*.whl
-      - dist/*.tar.gz
+      - ./doc/projectreport/*.pdf
+  artifacts:
+    paths:
+      - ./doc/projectreport/projectreport.pdf
     expire_in: 1 week
