@@ -24,11 +24,18 @@ build:
   image: danteev/texlive
   stage: build
   script:
+    # Install necessary tools for compiling PlantUML diagrams.
+    - apt-get update && apt-get install graphviz default-jre -y
+    # Compile all PlantUML (.puml) files into PNG images.
+    - java -jar ./doc/bin/plantuml-1.2025.0.jar -tpng ./doc/projectreport/figures/*.puml
+    # Change to Documentation folder for LaTeX compilation.
     - cd "./Documentation"
+    # Loop over every .tex file and compile it using latexmk.
     - for file in *.tex; do latexmk -pdf "$file"; done
   artifacts:
     paths:
       - "./Documentation/*.pdf"
+      - "./doc/projectreport/figures/*.png"
     expire_in: 1 week
 
 model1:
@@ -58,7 +65,6 @@ model4:
   script:
     - echo "Processing Model 4..."
     # Add your Model 4 processing commands here
-
 
 test:
   image: alpine:latest
