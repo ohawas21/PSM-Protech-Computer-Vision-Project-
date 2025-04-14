@@ -8,18 +8,17 @@ prepare:
   allow_failure: true
   script:
     - apt-get update && apt-get install -y graphviz
-    - java -jar ./doc/bin/plantuml-1.2025.0.jar -tpng ./doc/projectreport/figures/*.puml
+    - java -jar ./Documentation/ml_pipeline_workflow/plantuml-1.2025.0.jar -tpng ./Documentation/ml_pipeline_workflow/*.puml
   artifacts:
     paths:
-      - ./doc/projectreport/figures/*.png
+      - ./Documentation/ml_pipeline_workflow/*.png
 
 Documentation:
   image: danteev/texlive
   stage: build
   script:
-    - cd Documentation/"Project Milestone"
-    - latexmk -pdf Milestone.tex
+    - latexmk -pdf "Documentation/Project Milestone/Milestone.tex"
   artifacts:
     paths:
-      - Documentation/"Project Milestone"/*.pdf
+      - "Documentation/Project Milestone/Milestone.pdf"
     expire_in: 1 week
