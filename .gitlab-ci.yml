@@ -7,23 +7,19 @@ prepare:
   stage: prepare
   allow_failure: true
   script:
-    - apt-get update
-    - apt-get install graphviz -y
+    - apt-get update && apt-get install -y graphviz
     - java -jar ./doc/bin/plantuml-1.2025.0.jar -tpng ./doc/projectreport/figures/*.puml
   artifacts:
     paths:
       - ./doc/projectreport/figures/*.png
 
-build:
+Documentation:
   image: danteev/texlive
   stage: build
   script:
-    - cd ./"Project Milestone"
+    - cd Documentation/"Project Milestone"
     - latexmk -pdf Milestone.tex
   artifacts:
     paths:
-      - ./"Project Milestone"/*.pdf
-  artifacts:
-    paths:
-      - ./"Project Milestone"/*.pdf
+      - Documentation/"Project Milestone"/*.pdf
     expire_in: 1 week
