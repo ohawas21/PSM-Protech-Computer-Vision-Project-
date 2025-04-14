@@ -179,9 +179,3 @@ The ML pipeline is designed to process complex blueprint data in a sequential an
   The *PipelineManager* oversees the entire workflow, ensuring each dependency is met and steps are executed in the correct order, maintaining the integrity and efficiency of the pipeline.
 
 ---
-
-## Conclusion
-
-This ML pipeline is a comprehensive, modular, and sequential process designed to address the complexities of extracting and analyzing blueprint data for production feasibility. The modular design allows individual components to be developed, tested, and maintained independently while the orchestration layer ensures smooth integration of all parts. This README, along with the accompanying UML diagram, provides a clear roadmap for both implementation and future development.
-
-Copy and paste this README content into your markdown file to provide a detailed overview of the project workflow.
