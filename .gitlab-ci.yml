@@ -1,6 +1,6 @@
 stages:
 #  - prepare
-  - build
+  - Documentation
   - model1
   - model2
   - model3
@@ -20,7 +20,7 @@ stages:
 #    paths:
 #      - ./doc/projectreport/figures/*.png
 
-build:
+Documentation:
   image: danteev/texlive
   stage: build
   script:
