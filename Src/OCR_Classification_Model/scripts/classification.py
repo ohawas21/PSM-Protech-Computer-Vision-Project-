@@ -8,7 +8,7 @@ def generate_random_decimal():
     return f"{round(random.uniform(10.0, 99.9), 1)}"
 
 # Base directory for OCR Classification Model
-base_dir = "C:\Users\Admin\psm\PSM-Protech-Feasibility-Study-1\Src\OCR_Classification_Model"
+base_dir = r"C:\Users\Admin\psm\PSM-Protech-Feasibility-Study-1\Src\OCR_Classification_Model"
 
 # Identify input folders
 input_folders = [
