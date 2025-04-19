@@ -30,3 +30,31 @@ for class_name, images in class_dict.items():
     os.makedirs(os.path.join(train_dir, class_name), exist_ok=True)
     os.makedirs(os.path.join(test_dir, class_name), exist_ok=True)
     
+    # Copy train images
+    for img in train_images:
+        shutil.copy(os.path.join(data_dir, img), os.path.join(train_dir, class_name, img))
+    
+    # Copy test images
+    for img in test_images:
+        shutil.copy(os.path.join(data_dir, img), os.path.join(test_dir, class_name, img))
+
+# Training YOLOv8
+model_yolov8 = YOLO('yolov8l.pt')  # Load the YOLOv8 model
+
+# Assuming you create a custom YAML configuration file for YOLO
+# The YAML file should denote the paths for train and test datasets
+custom_yaml_path = 'path/to/your/custom.yaml'
+
+# Train YOLOv8
+model_yolov8.train(data=custom_yaml_path, epochs=50)
+
+# Training YOLOv11
+# Load your YOLOv11 model
+from yolov11 import YOLOv11  # Hypothetical import, replace with actual if it differs
+
+model_yolov11 = YOLOv11('yolov11l.pt')  # Load YOLOv11 model
+
+# Train YOLOv11
+model_yolov11.train(data=custom_yaml_path, epochs=50)
+
+# Evaluation code can be added here if needed
