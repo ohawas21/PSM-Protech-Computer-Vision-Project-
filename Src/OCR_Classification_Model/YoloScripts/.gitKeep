@@ -1,0 +1,61 @@
+import os
+import shutil
+from sklearn.model_selection import train_test_split
+from ultralytics import YOLO
+
+# Paths
+data_dir = 'path/to/image_files'
+train_dir = 'path/to/processed/train'
+test_dir = 'path/to/processed/test'
+
+
+os.makedirs(train_dir, exist_ok=True)
+os.makedirs(test_dir, exist_ok=True)
+
+# Load image and label file names
+image_files = [f for f in os.listdir(data_dir) if f.endswith(('.jpg', '.png'))]
+
+# Creating class-based folder structure
+class_dict = {}
+for img in image_files:
+    class_name = img.split('_')[0]  # Assuming filename format: class_image.jpg
+    if class_name not in class_dict:
+        class_dict[class_name] = []
+    class_dict[class_name].append(img)
+
+# Split each class's images into train and test
+for class_name, images in class_dict.items():
+    train_images, test_images = train_test_split(images, test_size=0.2)
+    
+    # Create class folders in train/test directories
+    os.makedirs(os.path.join(train_dir, class_name), exist_ok=True)
+    os.makedirs(os.path.join(test_dir, class_name), exist_ok=True)
+    
+    # Copy train images
+    for img in train_images:
+        shutil.copy(os.path.join(data_dir, img), os.path.join(train_dir, class_name, img))
+    
+    # Copy test images
+    for img in test_images:
+        shutil.copy(os.path.join(data_dir, img), os.path.join(test_dir, class_name, img))
+
+# Training YOLOv8
+model_yolov8 = YOLO('yolov8l.pt')  # Load the YOLOv8 model
+
+# Assuming you create a custom YAML configuration file for YOLO
+# The YAML file should denote the paths for train and test datasets
+custom_yaml_path = 'path/to/your/custom.yaml'
+
+# Train YOLOv8
+model_yolov8.train(data=custom_yaml_path, epochs=50)
+
+# Training YOLOv11
+# Load your YOLOv11 model
+from yolov11 import YOLOv11  # Hypothetical import, replace with actual if it differs
+
+model_yolov11 = YOLOv11('yolov11l.pt')  # Load YOLOv11 model
+
+# Train YOLOv11
+model_yolov11.train(data=custom_yaml_path, epochs=50)
+
+# Evaluation code can be added here if needed
