@@ -145,7 +145,7 @@ def main():
     create_yaml(len(class_names), class_names)
     model, metrics = train_model()
     val_images = [f for f in os.listdir(os.path.join(IMAGES_DIR, "val")) 
-                  if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
+         if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
     speed = evaluate_inference_speed(model, val_images)
     save_results(metrics, speed)
 
