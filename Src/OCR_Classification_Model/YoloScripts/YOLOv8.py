@@ -136,18 +136,3 @@ def save_results(metrics, speed):
     print("\nYOLOv8 Results:")
     print(pd.DataFrame([results]))
 
-def main():
-    create_data_dirs()
-    train_count, val_count, class_names = split_dataset()
-    print(f"YOLOv8: Dataset split: {train_count} training images, {val_count} validation images")
-    print(f"Classes: {class_names}")
-    
-    create_yaml(len(class_names), class_names)
-    model, metrics = train_model()
-    val_images = [f for f in os.listdir(os.path.join(IMAGES_DIR, "val")) 
-         if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
-    speed = evaluate_inference_speed(model, val_images)
-    save_results(metrics, speed)
-
-if __name__ == "__main__":
-    main()
