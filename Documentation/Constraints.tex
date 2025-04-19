@@ -1,61 +1,52 @@
-\documentclass{article}
+\documentclass[a4paper,12pt]{article}
+
 \usepackage[utf8]{inputenc}
-\usepackage{geometry}
-\geometry{a4paper, margin=1in}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage[margin=1in]{geometry}
+\usepackage{caption}
+\usepackage{lmodern}
+\usepackage{parskip}
+\usepackage{textcomp}
+\usepackage{fancyhdr}
+
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{Feasibility Analysis -- GD\&T Drawing AI}
+\lhead{Problem Statement}
+\rfoot{\thepage}
+
+\title{\textbf{Problem Statement -- Automating Drawing Analysis for Tolerance Feasibility}}
+\author{Your Name \\ PSM Protech GmbH Project}
+\date{\today}
 
 \begin{document}
 
-\section*{Project Constraints – Feasibility Analysis of Blueprints}
+\maketitle
 
-\begin{enumerate}
-    \item \textbf{Input Quality Constraints}
-    \begin{itemize}
-        \item Blueprint variability in layout, resolution, or format.
-        \item Presence of noise, smudges, or low contrast in scanned documents.
-        \item Non-standard formats or annotations such as handwritten notes.
-    \end{itemize}
+\section*{Customer Problem (Engineering Perspective)}
 
-    \item \textbf{Model Limitations}
-    \begin{itemize}
-        \item YOLO may struggle with ambiguous edges or overlapping regions.
-        \item OCR accuracy may drop for technical fonts or skewed/noisy images.
-    \end{itemize}
+In the quotation phase at PSM Protech GmbH, customers submit detailed mechanical drawings containing dimensions, tolerances, GD\&T symbols, and various callouts (commonly enclosed in ovals). Engineers must manually extract and interpret these symbols and values to assess manufacturability and process feasibility.
 
-    \item \textbf{Feasibility Rule Complexity}
-    \begin{itemize}
-        \item Difficulty translating informal manufacturing rules into clear logic.
-        \item Rules may evolve due to new technologies or changing tolerances.
-    \end{itemize}
+This manual extraction process is slow, error-prone, and highly repetitive---especially since a single drawing can contain over 500 callouts and multiple versions. Missing critical tolerances such as $\pm 0.01~\text{mm}$ can lead to incorrect quotations, increased production costs, or delays. Automating this analysis can significantly improve speed, accuracy, and consistency in early design evaluation.
 
-    \item \textbf{Annotation and Training Constraints}
-    \begin{itemize}
-        \item Annotating training data for rectangles and text is time-consuming.
-        \item Access to blueprints may be limited due to confidentiality concerns.
-    \end{itemize}
+\section*{Technical Problem (Machine Learning/Computer Vision Perspective)}
 
-    \item \textbf{Tooling and Technical Constraints}
-    \begin{itemize}
-        \item High computational demand for training and inference.
-        \item Need for compatibility with existing systems and file formats.
-    \end{itemize}
+To automate the interpretation of these engineering drawings, we propose a multi-stage pipeline using AI and computer vision:
 
-    \item \textbf{User Constraints}
-    \begin{itemize}
-        \item Certain decisions may still require manual verification.
-        \item Users expect clear and interpretable results from the system.
-    \end{itemize}
+\begin{itemize}
+  \item \textbf{Object Detection (YOLOv8):} Detect oval callouts and GD\&T frames (feature control frames) in the drawing.
+  \item \textbf{Image Classification:} Classify detected geometric tolerance symbols (e.g., flatness, roundness, perpendicularity) according to ISO 1101.
+  \item \textbf{Optical Character Recognition (OCR):} Extract numerical tolerance values (e.g., $\pm 0.05$, \text{O}10.2), text annotations (e.g., ``CC'', ``3x''), and datums (A, B, C).
+  \item \textbf{Rule-Based Classification:} Use customer-defined feasibility rules to classify dimensions as either feasible (green) or critical/infeasible (red).
+  \item \textbf{(Optional) Version Comparison:} Highlight changes between drawing revisions for re-review.
+\end{itemize}
 
-    \item \textbf{Time and Resource Constraints}
-    \begin{itemize}
-        \item Limited project timeline to build and evaluate the system.
-        \item Small team size or limited manpower may restrict model development.
-    \end{itemize}
-
-    \item \textbf{Evaluation Constraints}
-    \begin{itemize}
-        \item Ambiguity in defining correct outputs in complex or unclear cases.
-        \item Defining and achieving realistic performance benchmarks.
-    \end{itemize}
-\end{enumerate}
+\begin{figure}[h!]
+  \centering
+  \includegraphics[width=0.9\textwidth]{GDD-Drawing-Example.png}
+  \caption{AI-based detection pipeline: YOLO identifies oval callouts and symbol blocks; image classification labels GD\&T symbols; OCR extracts values for feasibility checking.}
+  \label{fig:pipeline_example}
+\end{figure}
 
 \end{document}
