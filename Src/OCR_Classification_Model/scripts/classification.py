@@ -3,67 +3,59 @@ import os
 import random
 import numpy as np
 
-# Function to generate a random float as a string (e.g., '6.7')
-def generate_random_tolerance():
-    return f"{round(random.uniform(5.0, 10.0), 1)}"
+# Function to generate a two-digit decimal number as a string (e.g., '53.4')
+def generate_random_decimal():
+    return f"{round(random.uniform(10.0, 99.9), 1)}"
 
-# Base paths
-base_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+# Base directory for OCR Classification Model
+base_dir = "/Users/mugeshvaikundamani/Library/Mobile Documents/com~apple~CloudDocs/THRo/PSE/PSM-Protech-Feasibility-Study/Src/OCR_Classification_Model"
 
-images_folder = os.path.join(base_path, "PreAnnotated")
-output_folder = os.path.join(base_path, "post_annotated")
+# Identify input folders
+input_folders = [
+    os.path.join(base_dir, "PreAnnotated"),
+    os.path.join(base_dir, "Annotator")
+]
+# Retain only those that exist
+input_folders = [folder for folder in input_folders if os.path.exists(folder)]
+if not input_folders:
+    raise FileNotFoundError("No valid input folders found under OCR_Classification_Model.")
 
 # Ensure output folder exists
+output_folder = os.path.join(base_dir, "post_annotator")
 os.makedirs(output_folder, exist_ok=True)
 
-# Check if images_folder exists
-if not os.path.exists(images_folder):
-    raise FileNotFoundError(f"Directory not found: {images_folder}")
+# Process images from each input folder
+for folder in input_folders:
+    for filename in os.listdir(folder):
+        if not filename.lower().endswith((".jpg", ".jpeg", ".png")):
+            continue
+        img_path = os.path.join(folder, filename)
+        img = cv2.imread(img_path)
+        if img is None:
+            print(f"Warning: couldn't load {img_path}")
+            continue
 
-# Load image files
-image_files = [f for f in os.listdir(images_folder) if f.lower().endswith((".jpg", ".png"))]
-if not image_files:
-    raise FileNotFoundError(f"No images found in: {images_folder}")
+        h, w = img.shape[:2]
+        seg_w = w // 3  # width of each of three equal segments
 
-# Process each image
-for image_file in image_files:
-    image_path = os.path.join(images_folder, image_file)
-    image = cv2.imread(image_path)
-    height, width = image.shape[:2]
+        # Draw and annotate segments
+        for i in range(3):
+            x0 = i * seg_w
+            x1 = w if i == 2 else (x0 + seg_w)
+            # Draw rectangle border for each segment
+            cv2.rectangle(img, (x0, 0), (x1, h), (0, 0, 0), 2)
 
-    print(f"Processing: {image_file}")
+            # Only annotate in 2nd and 3rd segments
+            if i in (1, 2):
+                decimal_text = generate_random_decimal()
+                text_size, _ = cv2.getTextSize(decimal_text, cv2.FONT_HERSHEY_SIMPLEX, 0.8, 2)
+                text_x = x0 + (seg_w - text_size[0]) // 2
+                text_y = h // 2 + text_size[1] // 2
+                cv2.putText(img, decimal_text, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
 
-    # Simulate 1–3 "symbols" randomly for demo
-    for _ in range(random.randint(1, 3)):
-        # Generate random position and box size
-        w, h = random.randint(30, 80), random.randint(30, 60)
+        # Save annotated image
+        out_path = os.path.join(output_folder, filename)
+        cv2.imwrite(out_path, img)
+        print(f"Processed and saved: {out_path}")
 
-        # Ensure valid range for x and y
-        x_max = max(0, width - w - 100)
-        y_max = max(0, height - h - 20)
-
-        # If x_max or y_max is non-positive, set x and y to 0 to avoid invalid ranges
-        x = random.randint(0, x_max) if x_max > 0 else 0
-        y = random.randint(0, y_max) if y_max > 0 else 0
-
-        label = "a"
-        tolerance = generate_random_tolerance()
-
-        # Draw black rectangle
-        cv2.rectangle(image, (x, y), (x + w, y + h), (0, 0, 0), 2)
-
-        # Put the label above the rectangle
-        cv2.putText(image, label, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
-
-        # Put the tolerance value to the right of the rectangle
-        cv2.putText(image, tolerance, (x + w + 10, y + int(h / 2)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
-
-        # Optional vertical separator line
-        cv2.line(image, (x + w + 5, y), (x + w + 5, y + h), (0, 0, 0), 1)
-
-    # Save the result
-    output_path = os.path.join(output_folder, image_file)
-    cv2.imwrite(output_path, image)
-    print(f"Saved to: {output_path}")
-
-print("All images processed and saved.")
+print("Done processing all images.")
