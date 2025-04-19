@@ -28,7 +28,7 @@
 
 In the quotation phase at PSM Protech GmbH, customers submit detailed mechanical drawings containing dimensions, tolerances, GD\&T symbols, and various callouts (commonly enclosed in ovals). Engineers must manually extract and interpret these symbols and values to assess manufacturability and process feasibility.
 
-This manual extraction process is slow, error-prone, and highly repetitive---especially since a single drawing can contain over 500 callouts and multiple versions. Missing critical tolerances such as $\pm 0.01~\text{mm}$ can lead to incorrect quotations, increased production costs, or delays. Automating this analysis can significantly improve speed, accuracy, and consistency in early design evaluation.
+This manual extraction process is slow, error-prone, and highly repetitive --- especially since a single drawing can contain over 500 callouts and multiple versions. Missing critical tolerances such as $\pm 0.01~\text{mm}$ can lead to incorrect quotations, increased production costs, or delays. Automating this analysis can significantly improve speed, accuracy, and consistency in early design evaluation.
 
 \section*{Technical Problem (Machine Learning/Computer Vision Perspective)}
 
@@ -44,7 +44,7 @@ To automate the interpretation of these engineering drawings, we propose a multi
 
 \begin{figure}[h!]
   \centering
-  \includegraphics[width=0.9\textwidth]{images/GDD-Drawing_Problemstatement.png} % Ensure this file path is correct
+  \includegraphics[width=0.9\textwidth]{images/GDD-Drawing_Problemstatement.png} % Make sure this path is correct
   \caption{AI-based detection pipeline: YOLO identifies oval callouts and symbol blocks; image classification labels GD\&T symbols; OCR extracts values for feasibility checking.}
   \label{fig:pipeline_example}
 \end{figure}
