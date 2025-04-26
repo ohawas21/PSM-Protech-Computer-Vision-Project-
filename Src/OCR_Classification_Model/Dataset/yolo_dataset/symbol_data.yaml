@@ -1,0 +1,5 @@
+names:
+- symbol
+nc: 1
+train: C:\Users\Admin\psm pro\PSM-Protech-Feasibility-Study\Src\OCR_Classification_Model\Dataset\yolo_dataset\images\train
+val: C:\Users\Admin\psm pro\PSM-Protech-Feasibility-Study\Src\OCR_Classification_Model\Dataset\yolo_dataset\images\val
