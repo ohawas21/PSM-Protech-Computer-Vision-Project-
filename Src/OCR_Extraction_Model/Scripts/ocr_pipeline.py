@@ -10,12 +10,13 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(mess
 
 class OCRPipeline:
     """
-    In-memory conversion of images to PDF buffers and rendering to images.
+    In-memory conversion of images to PDF buffers, rendering to images, and cropping into regions.
     """
     def __init__(self, image_dir: str):
         self.image_dir = Path(image_dir)
         self._pdf_buffers: dict[str, BytesIO] = {}
         self._page_images: dict[str, Image.Image] = {}
+        self._regions: dict[str, dict[str, Image.Image]] = {}
 
     def convert_images_to_pdf(self):
         """Convert images in the directory into in-memory PDF buffers."""
@@ -52,17 +53,37 @@ class OCRPipeline:
                 logging.warning(f"Failed to render {name}: {e}")
         logging.info(f"Rendered {len(self._page_images)} images successfully.")
 
+    def crop_regions(self):
+        """Crop each rendered page image into three table regions: Symbol, Value1, Value2."""
+        total = len(self._page_images)
+        logging.info(f"[STEP 3] Cropping {total} images into regions…")
+        for idx, (name, img) in enumerate(self._page_images.items(), start=1):
+            logging.info(f"  • ({idx}/{total}) Cropping '{name}'")
+            w, h = img.size
+            bounds = [
+                (0,            int(w * 0.12)),  # Symbol region
+                (int(w * 0.12), int(w * 0.52)), # Value1 region
+                (int(w * 0.52), w)              # Value2 region
+            ]
+            region_imgs = {}
+            for i, label in enumerate(['Symbol', 'Value1', 'Value2']):
+                left, right = bounds[i]
+                region_imgs[label] = img.crop((left, 0, right, h))
+                logging.info(f"    Cropped {label} for {name}")
+            self._regions[name] = region_imgs
+        logging.info(f"Cropped regions for {len(self._regions)} images.")
+
     def extract_table(self):
         """
-        Placeholder for table extraction logic:
-        - Crop into regions
-        - OCR and store results
+        Placeholder for OCR logic on cropped regions.
         """
-        # TODO: implement cropping and OCR per page image
+        # TODO: apply OCR to self._regions and collect structured data
         pass
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Convert images to in-memory PDFs and render to images")
+    parser = argparse.ArgumentParser(
+        description="Convert images to PDFs, render, and crop into regions"
+    )
     parser.add_argument(
         "--image_dir",
         default="Src/OCR_Extraction_Model/Dataset",
@@ -73,4 +94,5 @@ if __name__ == "__main__":
     pipeline = OCRPipeline(image_dir=args.image_dir)
     pipeline.convert_images_to_pdf()
     pipeline.render_pdfs_to_images()
-    # Next step: pipeline.extract_table()
+    pipeline.crop_regions()
+    # Next: pipeline.extract_table() for OCR
