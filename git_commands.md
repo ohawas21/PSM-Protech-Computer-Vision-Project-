@@ -22,8 +22,3 @@ git log --author="USERNAME" --pretty=format:"%h %ad %s" --date=short
 - **%ad**: Commit date (formatted as YYYY-MM-DD)
 - **%s**: Commit message subject
 ```
-
----
-
-✅ Now if you paste this into your markdown editor, it will render perfectly — just like you're expecting!  
-Would you also want me to give a version that includes a sample output so it looks even more polished? 📄✨
