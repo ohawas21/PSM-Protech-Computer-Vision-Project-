@@ -184,3 +184,16 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
+'''
+# YOLOv8 Training Script
+# 
+# usage
+# python train.py \
+  --source_dir data_source \
+  --model_save_path my_models/best.pt \
+  --train_ratio 0.75 \
+  --epochs 20 \
+  --batch_size 16
+# '''
