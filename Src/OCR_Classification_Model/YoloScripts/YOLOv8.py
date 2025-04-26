@@ -1,153 +1,186 @@
-import os
 import shutil
 import random
 import yaml
-import pandas as pd
 import numpy as np
-import cv2
-import matplotlib.pyplot as plt
-from sklearn.model_selection import train_test_split
-from ultralytics import YOLO
 import time
 import torch
+import argparse
+from pathlib import Path
+from ultralytics import YOLO
+from sklearn.model_selection import train_test_split
 
-# Set random seed for reproducibility
-random.seed(42)
-np.random.seed(42)
-torch.manual_seed(42)
+# Set seeds for reproducibility
+def set_seed(seed: int = 42):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
 
-# Define paths
-DATASET_DIR = "dataset"
-IMAGE_FILES_DIR = "image_files"
-IMAGES_DIR = os.path.join(DATASET_DIR, "images")
-LABELS_DIR = os.path.join(DATASET_DIR, "labels")
-OUTPUT_DIR = "runs/yolov8"
-YAML_FILE = "data_yolov8.yaml"
+# Parse command-line arguments
+def get_args():
+    parser = argparse.ArgumentParser(description="Train YOLOv8 on a custom dataset")
+    parser.add_argument('--source_dir', type=str, required=True,
+                        help='Folder containing images and .txt labels')
+    parser.add_argument('--train_ratio', type=float, default=0.8,
+                        help='Fraction of data to use for training')
+    parser.add_argument('--epochs', type=int, default=10,
+                        help='Number of training epochs')
+    parser.add_argument('--batch_size', type=int, default=8,
+                        help='Batch size for training')
+    parser.add_argument('--img_size', type=int, default=640,
+                        help='Image size (px) for training')
+    parser.add_argument('--project_dir', type=str, default='runs',
+                        help='YOLO project directory')
+    parser.add_argument('--exp_name', type=str, default='exp',
+                        help='Experiment name')
+    parser.add_argument('--model_save_path', type=str, required=True,
+                        help='Full path to save the best model weights (.pt)')
+    return parser.parse_args()
 
-# Create directories for train and val splits
-def create_data_dirs():
-    for folder in [
-        os.path.join(IMAGES_DIR, "train"),
-        os.path.join(IMAGES_DIR, "val"),
-        os.path.join(LABELS_DIR, "train"),
-        os.path.join(LABELS_DIR, "val")
-    ]:
-        os.makedirs(folder, exist_ok=True)
+# Prepare dataset directories
+def prepare_dirs(base: str = 'dataset') -> tuple[Path, Path]:
+    """
+    Creates train/val folders for images and labels.
+    Returns (images_dir, labels_dir).
+    """
+    base_path = Path(base)
+    img_path = base_path / 'images'
+    lbl_path = base_path / 'labels'
+    for split in ('train', 'val'):
+        (img_path / split).mkdir(parents=True, exist_ok=True)
+        (lbl_path / split).mkdir(parents=True, exist_ok=True)
+    return img_path, lbl_path
 
-# Extract class names from image filenames
-def get_class_names(image_files):
-    class_names = set()
-    for img in image_files:
-        base_name = os.path.splitext(img)[0]
-        class_name = base_name.split('_')[0] if '_' in base_name else base_name
-        class_names.add(class_name)
-    return sorted(list(class_names))
+# Split data and copy from a single source folder containing both images and .txt labels
+def split_and_copy(
+    src_dir: str,
+    img_dir: Path,
+    lbl_dir: Path,
+    train_ratio: float = 0.8,
+    seed: int = 42
+) -> list[str]:
+    """
+    Splits images and their corresponding .txt label files from the same folder.
+    Returns sorted list of class names inferred from filename prefixes.
+    """
+    src = Path(src_dir)
+    images = list(src.glob('*.[jp][pn]g'))
+    if not images:
+        raise FileNotFoundError(f"No images found in {src_dir}")
 
-# Generate dummy YOLO-format labels
-def generate_dummy_labels(image_path, class_name, class_names):
-    class_id = class_names.index(class_name)
-    img = cv2.imread(image_path)
-    if img is None:
-        return None
-    h, w = img.shape[:2]
-    x_center, y_center, box_width, box_height = 0.5, 0.5, 0.5, 0.5
-    label = f"{class_id} {x_center} {y_center} {box_width} {box_height}"
-    return label
-
-# Split dataset and generate labels
-def split_dataset(test_size=0.2):
-    image_files = [f for f in os.listdir(IMAGE_FILES_DIR) 
-                   if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
-    if not image_files:
-        raise ValueError("No images found in image_files directory")
-    
-    class_names = get_class_names(image_files)
-    if not class_names:
-        raise ValueError("No class names could be inferred from image filenames")
-    
+    classes = sorted({img.stem.split('_')[0] for img in images})
     train_imgs, val_imgs = train_test_split(
-        image_files, test_size=test_size, random_state=42
+        images, train_size=train_ratio, random_state=seed
     )
-    
-    os.makedirs(LABELS_DIR, exist_ok=True)
-    for split, img_list in [("train", train_imgs), ("val", val_imgs)]:
-        for img in img_list:
-            src_img_path = os.path.join(IMAGE_FILES_DIR, img)
-            dst_img_path = os.path.join(IMAGES_DIR, split, img)
-            shutil.copy(src_img_path, dst_img_path)
-            
-            base_name = os.path.splitext(img)[0]
-            class_name = base_name.split('_')[0] if '_' in base_name else base_name
-            label = generate_dummy_labels(src_img_path, class_name, class_names)
-            if label:
-                label_path = os.path.join(LABELS_DIR, split, f"{base_name}.txt")
-                with open(label_path, 'w') as f:
-                    f.write(label)
-    
-    return len(train_imgs), len(val_imgs), class_names
+    splits = {'train': train_imgs, 'val': val_imgs}
 
-# Create YAML configuration file
-def create_yaml(num_classes, class_names):
-    data = {
-        'train': os.path.join(IMAGES_DIR, 'train'),
-        'val': os.path.join(IMAGES_DIR, 'val'),
-        'nc': num_classes,
-        'names': class_names
+    for split, img_list in splits.items():
+        for img_path in img_list:
+            # copy image
+            (img_dir / split / img_path.name).write_bytes(img_path.read_bytes())
+            # copy corresponding label if exists
+            label_src = src / f"{img_path.stem}.txt"
+            if label_src.exists():
+                (lbl_dir / split / label_src.name).write_bytes(label_src.read_bytes())
+
+    return classes
+
+# Write YOLO YAML config file
+def write_yaml(
+    classes: list[str],
+    img_dir: Path,
+    out: str = 'data.yaml'
+) -> str:
+    cfg = {
+        'train': str(img_dir / 'train'),
+        'val': str(img_dir / 'val'),
+        'nc': len(classes),
+        'names': classes
     }
-    with open(YAML_FILE, 'w') as f:
-        yaml.dump(data, f, default_flow_style=False)
+    Path(out).write_text(yaml.dump(cfg))
+    return out
 
-# Train model and return metrics
-def train_model(epochs=10, batch_size=8, imgsz=640):
-    model = YOLO("yolov8n.pt")
-    results = model.train(
-        data=YAML_FILE,
+# Train and validate YOLO model
+def train_yolo(
+    config: str,
+    epochs: int,
+    batch_size: int,
+    img_size: int,
+    project: str,
+    name: str
+) -> tuple[YOLO, any, Path]:
+    device = 0 if torch.cuda.is_available() else 'cpu'
+    model = YOLO('yolov8n.pt')
+    model.train(
+        data=config,
         epochs=epochs,
         batch=batch_size,
-        imgsz=imgsz,
-        device=0 if torch.cuda.is_available() else 'cpu',
-        project=OUTPUT_DIR,
-        name="train",
+        imgsz=img_size,
+        device=device,
+        project=project,
+        name=name,
         patience=3,
         seed=42
     )
     metrics = model.val()
-    return model, metrics
+    best_weights = Path(project) / name / 'weights' / 'best.pt'
+    return model, metrics, best_weights
 
-# Evaluate inference speed
-def evaluate_inference_speed(model, test_images, num_runs=50):
+# Measure inference speed
+def measure_speed(
+    model: YOLO,
+    img_dir: Path,
+    runs: int = 50
+) -> float:
+    val_imgs = list(img_dir / 'val'.glob('*.[jp][pn]g'))[:runs]
     times = []
-    for img_path in test_images[:num_runs]:
-        start_time = time.time()
-        model.predict(os.path.join(IMAGES_DIR, "val", img_path), conf=0.5, iou=0.75)
-        times.append(time.time() - start_time)
-    avg_time = np.mean(times) * 1000  # Convert to milliseconds
-    return avg_time
+    for img_path in val_imgs:
+        start = time.time()
+        model.predict(str(img_path), conf=0.5, iou=0.75)
+        times.append(time.time() - start)
+    return np.mean(times) * 1000
 
-# Save results
-def save_results(metrics, speed):
-    results = {
-        'mAP@50': metrics.results_dict['metrics/mAP50(B)'],
-        'mAP@50:95': metrics.results_dict['metrics/mAP50-95(B)'],
-        'Inference Speed (ms)': speed
-    }
-    with open(os.path.join(OUTPUT_DIR, 'results.yaml'), 'w') as f:
-        yaml.dump(results, f, default_flow_style=False)
-    print("\nYOLOv8 Results:")
-    print(pd.DataFrame([results]))
-
+# Main execution
 def main():
-    create_data_dirs()
-    train_count, val_count, class_names = split_dataset()
-    print(f"YOLOv8: Dataset split: {train_count} training images, {val_count} validation images")
-    print(f"Classes: {class_names}")
-    
-    create_yaml(len(class_names), class_names)
-    model, metrics = train_model()
-    val_images = [f for f in os.listdir(os.path.join(IMAGES_DIR, "val")) 
-         if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
-    speed = evaluate_inference_speed(model, val_images)
-    save_results(metrics, speed)
+    args = get_args()
+    set_seed()
 
-if __name__ == "__main__":
+    # Prepare dataset structure
+    img_dir, lbl_dir = prepare_dirs()
+    classes = split_and_copy(
+        src_dir=args.source_dir,
+        img_dir=img_dir,
+        lbl_dir=lbl_dir,
+        train_ratio=args.train_ratio
+    )
+
+    # Generate config
+    cfg_path = write_yaml(classes, img_dir)
+
+    # Train and save best model
+    model, metrics, best_weights = train_yolo(
+        config=cfg_path,
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        img_size=args.img_size,
+        project=args.project_dir,
+        name=args.exp_name
+    )
+    if best_weights.exists():
+        dest = Path(args.model_save_path)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(best_weights, dest)
+        print(f"Best model saved to: {dest}")
+
+    # Evaluate speed and save metrics
+    speed_ms = measure_speed(model, img_dir)
+    results = {
+        'mAP50': metrics.results_dict['metrics/mAP50(B)'],
+        'mAP50-95': metrics.results_dict['metrics/mAP50-95(B)'],
+        'Speed_ms': speed_ms
+    }
+    results_path = Path(args.project_dir) / args.exp_name / 'results.yaml'
+    results_path.write_text(yaml.dump(results))
+    print("Results:", results)
+
+if __name__ == '__main__':
     main()
