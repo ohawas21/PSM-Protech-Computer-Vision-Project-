@@ -1,25 +1,14 @@
 stages:
-#  - prepare
   - build
   - model1
   - model2
   - model3
   - model4
   - test
+  - gitlog
   - deploy
 
-#prepare:
-#  image: eclipse-temurin:21-jdk
-#  stage: prepare
-#  allow_failure: true
-#  script:
-#    - apt-get update
-#    - apt-get install graphviz -y
-#    - java -jar ./doc/bin/plantuml-1.2025.0.jar -tpng ./doc/projectreport/figures/*.puml
-#  artifacts:
-#    paths:
-#      - ./doc/projectreport/figures/*.png
-
+# Build stage: Build documentation PDFs
 build:
   image: danteev/texlive
   stage: build
@@ -31,45 +20,53 @@ build:
       - "./Documentation/*.pdf"
     expire_in: 1 week
 
+# Model stages: Placeholder for your model execution
 model1:
   image: alpine:latest
   stage: model1
   script:
     - echo "Processing Model 1..."
-    # Add your Model 1 processing commands here
 
 model2:
   image: alpine:latest
   stage: model2
   script:
     - echo "Processing Model 2..."
-    # Add your Model 2 processing commands here
 
 model3:
   image: alpine:latest
   stage: model3
   script:
     - echo "Processing Model 3..."
-    # Add your Model 3 processing commands here
 
 model4:
   image: alpine:latest
   stage: model4
   script:
     - echo "Processing Model 4..."
-    # Add your Model 4 processing commands here
 
-
+# Test stage: Placeholder for tests
 test:
   image: alpine:latest
   stage: test
   script:
     - echo "Running tests..."
-    # Replace with your testing commands (e.g., unit tests, integration tests)
 
+# GitLog stage: Capture commit summary per user
+gitlog:
+  image: python:3.10
+  stage: gitlog
+  script:
+    - pip install --no-cache-dir --upgrade pip
+    - python auto_commit_summary.py
+  artifacts:
+    paths:
+      - commit_summary_*.log
+    expire_in: 1 week
+
+# Deploy stage: Placeholder for deployment
 deploy:
   image: alpine:latest
   stage: deploy
   script:
     - echo "Deploying application..."
-    # Replace with your deployment commands, such as uploading artifacts or updating servers
