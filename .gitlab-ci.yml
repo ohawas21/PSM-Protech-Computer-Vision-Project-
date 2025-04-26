@@ -1,4 +1,3 @@
-# .gitlab-ci.yml
 stages:
   - build
   - model1
@@ -9,7 +8,6 @@ stages:
   - gitlog
   - deploy
 
-# 1) Build stage: Build all .tex docs into PDFs
 build:
   image: danteev/texlive
   stage: build
@@ -21,59 +19,54 @@ build:
       - Documentation/*.pdf
     expire_in: 1 week
 
-# 2)–5) Model placeholder stages
 model1:
   image: alpine:latest
   stage: model1
   script:
     - echo "Processing Model 1..."
+
 model2:
   image: alpine:latest
   stage: model2
   script:
     - echo "Processing Model 2..."
+
 model3:
   image: alpine:latest
   stage: model3
   script:
     - echo "Processing Model 3..."
+
 model4:
   image: alpine:latest
   stage: model4
   script:
     - echo "Processing Model 4..."
 
-# 6) Test placeholder
 test:
   image: alpine:latest
   stage: test
   script:
     - echo "Running tests..."
 
-# 7) GitLog: generate per-user commit summary
 gitlog:
   image: python:3.10
   stage: gitlog
-  # ensure a full history (not shallow) so `git shortlog` sees every commit
   before_script:
     - git fetch --unshallow || true
     - git fetch --all --tags
   script:
-    # confirm we're in the repo root and .git exists
     - echo "Working dir: $PWD"
     - ls -lah .git
-    # install dependencies & run your generator
     - pip install --no-cache-dir --upgrade pip
     - mkdir -p gitlog_outputs
     - python auto_commit_summary.py
-    # show the output files
     - ls -R gitlog_outputs
   artifacts:
     paths:
       - gitlog_outputs/*.log
     expire_in: 1 week
 
-# 8) Deploy placeholder
 deploy:
   image: alpine:latest
   stage: deploy
