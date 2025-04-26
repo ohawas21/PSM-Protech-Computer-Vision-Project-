@@ -5,9 +5,9 @@ stages:
   - model3
   - model4
   - test
-  - gitlog
   - deploy
 
+# Build stage: Build documentation PDFs
 build:
   image: danteev/texlive
   stage: build
@@ -19,6 +19,7 @@ build:
       - Documentation/*.pdf
     expire_in: 1 week
 
+# Model stages: Placeholder for your model execution
 model1:
   image: alpine:latest
   stage: model1
@@ -43,30 +44,14 @@ model4:
   script:
     - echo "Processing Model 4..."
 
+# Test stage: Placeholder for tests
 test:
   image: alpine:latest
   stage: test
   script:
     - echo "Running tests..."
 
-gitlog:
-  image: python:3.10
-  stage: gitlog
-  before_script:
-    - git fetch --unshallow || true
-    - git fetch --all --tags
-  script:
-    - echo "Working dir: $PWD"
-    - ls -lah .git
-    - pip install --no-cache-dir --upgrade pip
-    - mkdir -p gitlog_outputs
-    - python auto_commit_summary.py
-    - ls -R gitlog_outputs
-  artifacts:
-    paths:
-      - gitlog_outputs/*.log
-    expire_in: 1 week
-
+# Deploy stage: Placeholder for deployment
 deploy:
   image: alpine:latest
   stage: deploy
