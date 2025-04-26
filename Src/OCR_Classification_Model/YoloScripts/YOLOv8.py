@@ -108,7 +108,14 @@ def train_yolo(
     project: str,
     name: str
 ) -> tuple[YOLO, any, Path]:
-    device = 0 if torch.cuda.is_available() else 'cpu'
+    # Choose device: CUDA > MPS (Apple Silicon) > CPU
+    if torch.cuda.is_available():
+        device = 0
+    elif torch.backends.mps.is_available():  # Apple MPS support
+        device = 'mps'
+    else:
+        device = 'cpu'
+
     model = YOLO('yolov8n.pt')
     model.train(
         data=config,
@@ -185,15 +192,14 @@ def main():
 if __name__ == '__main__':
     main()
 
-
 '''
-# YOLOv8 Training Script
-# 
-# usage
-# python train.py \
-  --source_dir data_source \
-  --model_save_path my_models/best.pt \
-  --train_ratio 0.75 \
-  --epochs 20 \
-  --batch_size 16
-# '''
+python train.py \
+  --source_dir   data_source \
+  --train_ratio  0.75 \
+  --epochs       20 \
+  --batch_size   16 \
+  --img_size     640 \
+  --project_dir  runs \
+  --exp_name     my_experiment \
+  --model_save_path  outputs/best_model.pt
+  '''
