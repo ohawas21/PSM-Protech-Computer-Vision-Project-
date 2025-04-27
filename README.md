@@ -12,24 +12,6 @@ This project outlines a 10-week AI model pipeline development workflow, includin
 - 📤 Exporting Results to Excel/CSV
 
 The report includes detailed timelines, milestones, and annotation processes necessary to build a robust and modular deep learning pipeline.
-
----
-
-## 👥 Participants
-
-The following contributors have participated in this project:
-
-| Full Name               | Usernames                                |
-|--------------------------|-----------------------------------------|
-| Mugesh Vaikundamani      | studvaikmu5453, mugeshvaikundamani       |
-| Ahmed Alyan Roshan       | studroshah4879, Ahmed Alyan Roshan       |
-| Mohammed Areeb Khan      | Mohammed Areeb Khan, studkhanmo7137      |
-| Shahryaar Zia            | studziaash9914, shaheryaar              |
-| Omar Hawas               | Omar Hawas, studhawaom4035              |
-| Alina Roshan             | studroshal9312                          |
-
-> ℹ️ *Some usernames were mapped manually where possible. If any corrections are needed, please update this table.*
-
 ---
 
 ## 📚 For more information:
