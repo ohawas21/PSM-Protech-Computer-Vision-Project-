@@ -28,14 +28,23 @@ ocr_classification:
   stage: ocr_classification
   image: python:3.10
   allow_failure: true
+  variables:
+    PIP_DISABLE_PIP_VERSION_CHECK: "1"
   script:
-    - echo "Preparing OCR Classification model preload test..."
-    - cd Src/OCR_Classification_Model/Model
+    # 1) Show where GitLab is running now
+    - echo "Workspace root: $CI_PROJECT_DIR"
+    - pwd
+    - ls -R "$CI_PROJECT_DIR"
+    # 2) Change into your model folder (adjust casing if needed)
+    - cd "$CI_PROJECT_DIR/Src/OCR_Classification_Model/Model"
+    - echo "Now in: $(pwd)"
+    - ls -R .
+    # 3) Install and test
     - pip install --upgrade pip
-    - echo "Pip upgraded"
     - pip install -r requirements.txt
     - echo "Running classification test"
     - python test_model.py
+
 
 model3:
   stage: model3
