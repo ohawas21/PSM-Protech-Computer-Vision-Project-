@@ -1,7 +1,7 @@
 stages:
   - build
   - model1
-  - model2
+  - Ocr_Classification
   - model3
   - model4
   - test
@@ -26,11 +26,19 @@ model1:
   script:
     - echo "Processing Model 1..."
 
-model2:
-  image: alpine:latest
-  stage: model2
+Ocr_Classfication:
+  image: python:3.10
+  stage: Ocr_Classification
+  allow_failue : true
   script:
-    - echo "Processing Model 2..."
+    - echo "Preparing Ocr Model for preload Test..."
+    - cd Src/OCR_Classification_Model/Model
+    - pip install --upgrade pip
+    - echo "Pip Upgraded"
+    - pip install -r requirements.txt
+    - echo "Testing File"
+    - python test_model.py
+  
 
 model3:
   image: alpine:latest
