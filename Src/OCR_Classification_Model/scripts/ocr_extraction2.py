@@ -146,6 +146,19 @@ class OCRProcessor:
             print("[extract_numbers_and_save] No numeric matches found.")
             return None
 
+if __name__ == '__main__':
+    # === Adjust these paths to your own environment ===
+    BASE_IMG_DIR = r"C:\Users\Admin\PSE\PSM-Protech-Feasibility-Study\Src\OCR_Extraction_Model\Dataset\images"
+    POPPLER_BIN = r"C:\poppler-23.05.0\Library\bin"
+    OUTPUT_CSV = r"C:\Users\Admin\PSE\extracted_numbers.csv"
+
+    processor = OCRProcessor(
+        image_dir=BASE_IMG_DIR,
+        poppler_path=POPPLER_BIN,
+        output_csv=OUTPUT_CSV
+    )
+    csv_file = processor.extract_numbers_and_save()
+    print("Done. CSV written to:", csv_file)
 
     
 
