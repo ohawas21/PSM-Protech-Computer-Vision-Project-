@@ -1,0 +1,100 @@
+% Filename: kickoff_minutes.tex
+\documentclass[a4paper,12pt]{article}
+\usepackage[margin=1in]{geometry} 
+\usepackage{parskip}               % blank lines instead of indent
+\usepackage{hyperref}              % clickable links
+\usepackage{graphicx}              % include images if needed
+\usepackage{enumitem}              % control list spacing
+\usepackage{fancyhdr}              % headers & footers
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+
+% Header/footer setup
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{Kickoff Meeting Minutes}
+\rhead{PSM Protech Feasibility Study}
+\cfoot{\thepage}
+
+\title{\Large\bfseries Kickoff Meeting Minutes\\[0.5ex]
+       \normalfont PSM Protech Feasibility Analysis Project}
+\author{Students Team \& PSM Protech GmbH}
+\date{31 March 2025}
+
+\begin{document}
+\maketitle
+
+\section*{1. General Information}
+\begin{description}[leftmargin=!,labelwidth=\widthof{\bfseries Duration:}]
+  \item[Date \& Time:] 31 March 2025, 10:00\,--\,12:00
+  \item[Location:] PSM Protech GmbH headquarters
+  \item[Duration:] Approximately 2 hours
+\end{description}
+
+\subsection*{Participants}
+\begin{itemize}[noitemsep]
+  \item Five student representatives (Engineering Master’s, TH Rosenheim)
+  \item Prof.\ Dr.\ Michael Wagner (Project Supervisor)
+  \item PSM Protech GmbH team
+\end{itemize}
+
+\subsection*{Distribution List}
+\begin{itemize}[noitemsep]
+  \item Project manager (PSM Protech GmbH)
+  \item Department heads (Tribology \& AI teams)
+  \item All students on the project team
+  \item Prof.\ Dr.\ Wagner
+\end{itemize}
+
+\section*{2. Key Discussion Points}
+\begin{enumerate}[label=\arabic*.,leftmargin=*]
+  \item \textbf{Project Overview:} 
+    \begin{itemize}[noitemsep]
+      \item PSM Protech presented the overall goals: automate GD\&T extraction and tolerance feasibility analysis from mechanical drawings.
+      \item Reviewed scope, timeline, and high-level deliverables.
+    \end{itemize}
+  \item \textbf{Dataset Preview:}
+    \begin{itemize}[noitemsep]
+      \item Company provided sample PDF drawings and CSV reports.
+      \item Discussed data formats (SVG/PDF for drawings, CSV for annotations).
+    \end{itemize}
+  \item \textbf{Project Aim \& Process Tour:}
+    \begin{itemize}[noitemsep]
+      \item Walked through PSM Protech’s engineering facilities.
+      \item Highlighted manufacturing constraints and real-world tolerance checks.
+    \end{itemize}
+  \item \textbf{Next Steps:}
+    \begin{itemize}[noitemsep]
+      \item Await delivery of full dataset from PSM Protech.
+      \item Student team to begin exploratory data analysis (EDA) and pipeline prototyping.
+    \end{itemize}
+\end{enumerate}
+
+\section*{3. Decisions \& Action Items}
+At this kickoff no individual task assignments were finalized. The student team will self-organize after dataset delivery. 
+
+\begin{description}[leftmargin=!,labelwidth=\widthof{\bfseries Tasks to Date:}]
+  \item[Tasks:] 
+    \begin{itemize}[noitemsep]
+      \item \emph{Pending Dataset}: PSM Protech to supply the remainder of drawing files and CSV annotations.
+      \item \emph{Exploratory Analysis}: Students to prepare initial report on data quality and required preprocessing steps.
+    \end{itemize}
+  \item[Responsible:] Student team (collectively)
+  \item[Due:] TBD (upon dataset arrival)
+  \item[Binding Notes:] None at this stage
+\end{description}
+
+\section*{4. Repository \& Archiving}
+\begin{itemize}[noitemsep]
+  \item Invitation and this minutes document stored under \texttt{Documentation/} folder in project repository.
+  \item Meeting agenda, slides, and photos of whiteboard sketches are likewise committed.
+  \item Wiki page (\url{https://gitlab.example.com/yourproject/wiki/Kickoff}) links to all materials.
+\end{itemize}
+
+\vfill
+\hrulefill\\
+\small
+\textit{Prepared by: Student Coordination Team}\\
+\textit{Reviewed by: Prof.\ Dr.\ Michael Wagner, PSM Protech GmbH}
+
+\end{document}
