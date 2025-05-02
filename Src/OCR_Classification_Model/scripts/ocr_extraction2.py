@@ -50,6 +50,18 @@ class TableOCRExtractor:
         pdf_path.write_bytes(buf.getvalue())
         return pdf_path
 
+    def try_camelot(self, pdf_path: Path, name: str):
+        try:
+            tables = camelot.read_pdf(str(pdf_path), flavor="stream", pages="1")
+            if tables:
+                df = tables[0].df
+                c2 = df.iloc[0,1].strip()
+                c3 = df.iloc[0,2].strip()
+                logger.info("  ✔ Camelot parsed %s → %s, %s", name, c2, c3)
+                return c2, c3
+        except Exception as e:
+            logger.warning("  Camelot error on %s: %s", name, e)
+        return None
 
 
 
