@@ -130,6 +130,8 @@ class TableOCRExtractor:
         df.to_csv(OUTPUT_CSV, index=False)
         logger.info("✅ Saved %d rows to %s", len(df), OUTPUT_CSV)
 
+if __name__ == "__main__":
+    TableOCRExtractor(IMAGE_DIR).run()
 
 
  
