@@ -89,6 +89,20 @@ class TableOCRExtractor:
         inv = cv2.bitwise_not(th)
         up = cv2.resize(inv, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
         return Image.fromarray(up)
+    
+    def ocr_region(self, region: Image.Image, name: str, label: str) -> Optional[str]:
+        prep = self.preprocess(region)
+        txt = pytesseract.image_to_string(prep, config=TESS_CONFIG).strip()
+        snippet = txt.replace("\n", " ")[:40]
+        logger.info("    OCR[%s] snippet: '%s...';", label, snippet)
+        m = re.search(r"\d+\.\d+", txt)
+        if m:
+            val = m.group(0)
+            logger.info("    → %s = %s", label, val)
+            return val
+        logger.warning("    ⚠️ %s region %s: no decimal found", name, label)
+        return None
+
 
      
 
