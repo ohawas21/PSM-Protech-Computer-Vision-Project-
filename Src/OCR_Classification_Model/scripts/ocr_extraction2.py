@@ -63,6 +63,13 @@ class TableOCRExtractor:
             logger.warning("  Camelot error on %s: %s", name, e)
         return None
 
+    def render_pdf_to_image(self, pdf_path: Path) -> Image.Image | None:
+        try:
+            pages = convert_from_bytes(pdf_path.read_bytes(), dpi=300)
+            return pages[0] if pages else None
+        except Exception as e:
+            logger.error("  PDF rendering error for %s: %s", pdf_path.name, e)
+            return None
 
 
 
