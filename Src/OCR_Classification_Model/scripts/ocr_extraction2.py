@@ -34,6 +34,15 @@ warnings.filterwarnings('ignore', category=UserWarning)
 # Tesseract config: only digits and dot
 TESS_CONFIG = "--psm 7 --oem 3 -c tessedit_char_whitelist=0123456789."
 
+class TableOCRExtractor:
+    def __init__(self, image_dir: Path):
+        self.image_dir = image_dir
+        self.pdf_dir   = PDF_DIR
+        self.pdf_dir.mkdir(parents=True, exist_ok=True)
+        CSV_DIR.mkdir(parents=True, exist_ok=True)
+        self.results = []  # list of dicts: { 'source_image', 'col2', 'col3' }
+
+
 
 
 
