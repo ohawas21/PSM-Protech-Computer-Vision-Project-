@@ -42,6 +42,14 @@ class TableOCRExtractor:
         CSV_DIR.mkdir(parents=True, exist_ok=True)
         self.results = []  # list of dicts: { 'source_image', 'col2', 'col3' }
 
+    def convert_image_to_pdf(self, img_path: Path) -> Path:
+        buf = BytesIO()
+        Image.open(img_path).convert("RGB").save(buf, format="PDF")
+        buf.seek(0)
+        pdf_path = self.pdf_dir / f"{img_path.stem}.pdf"
+        pdf_path.write_bytes(buf.getvalue())
+        return pdf_path
+
 
 
 
