@@ -11,8 +11,6 @@ import pandas as pd
 from PIL import Image
 from pdf2image import convert_from_bytes
 import pytesseract
-from typing import Optional
-
 
 # ─── Configuration ──────────────────────────────────────────────────────────────
 IMAGE_DIR   = Path(r"PSM-Protech-Feasibility-Study\Src\OCR_Extraction_Model\Dataset")
@@ -72,7 +70,7 @@ class TableOCRExtractor:
         except Exception as e:
             logger.error("  PDF rendering error for %s: %s", pdf_path.name, e)
             return None
-        
+
     def crop_columns(self, img: Image.Image) -> tuple[Image.Image, Image.Image]:
         W, H = img.size
         x1 = int(W * 0.20)
@@ -81,16 +79,16 @@ class TableOCRExtractor:
         col2_img = img.crop((x1, 0, x2, H))
         col3_img = img.crop((x2, 0, x3, H))
         return col2_img, col3_img
-        
+
     def preprocess(self, region: Image.Image) -> Image.Image:
         arr = cv2.cvtColor(np.array(region), cv2.COLOR_RGB2GRAY)
-        blur = cv2.GaussianBlur(arr, (3, 3), 0)
+        blur = cv2.GaussianBlur(arr, (3,3), 0)
         _, th = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
         inv = cv2.bitwise_not(th)
         up = cv2.resize(inv, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
         return Image.fromarray(up)
-    
-    def ocr_region(self, region: Image.Image, name: str, label: str) -> Optional[str]:
+
+    def ocr_region(self, region: Image.Image, name: str, label: str) -> str | None:
         prep = self.preprocess(region)
         txt = pytesseract.image_to_string(prep, config=TESS_CONFIG).strip()
         snippet = txt.replace("\n", " ")[:40]
@@ -102,6 +100,41 @@ class TableOCRExtractor:
             return val
         logger.warning("    ⚠️ %s region %s: no decimal found", name, label)
         return None
+
+    def run(self):
+        logger.info("+++ Starting hybrid Camelot+OCR pipeline +++")
+        imgs = sorted(self.image_dir.glob("*.*"))
+        imgs = [p for p in imgs if p.suffix.lower() in {'.png','.jpg','.jpeg','.tif','.tiff'}]
+        logger.info(f"Processing {len(imgs)} images...")
+
+        for img_path in imgs:
+            name = img_path.stem
+            logger.info(f"Processing '{name}'")
+
+            pdf = self.convert_image_to_pdf(img_path)
+            res = self.try_camelot(pdf, name)
+            if not res:
+                page_img = self.render_pdf_to_image(pdf)
+                if page_img:
+                    col2_img, col3_img = self.crop_columns(page_img)
+                    v2 = self.ocr_region(col2_img, name, 'col2')
+                    v3 = self.ocr_region(col3_img, name, 'col3')
+                    if v2 and v3:
+                        res = (v2, v3)
+
+            if res:
+                c2, c3 = res
+                self.results.append({'source_image': name, 'col2': c2, 'col3': c3})
+
+        df = pd.DataFrame(self.results)
+        df.to_csv(OUTPUT_CSV, index=False)
+        logger.info("✅ Saved %d rows to %s", len(df), OUTPUT_CSV)
+
+
+
+ 
+
+
 
 
      
