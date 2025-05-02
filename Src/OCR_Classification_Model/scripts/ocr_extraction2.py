@@ -11,6 +11,8 @@ import pandas as pd
 from PIL import Image
 from pdf2image import convert_from_bytes
 import pytesseract
+from typing import Optional
+
 
 # ─── Configuration ──────────────────────────────────────────────────────────────
 IMAGE_DIR   = Path(r"PSM-Protech-Feasibility-Study\Src\OCR_Extraction_Model\Dataset")
@@ -79,6 +81,17 @@ class TableOCRExtractor:
         col2_img = img.crop((x1, 0, x2, H))
         col3_img = img.crop((x2, 0, x3, H))
         return col2_img, col3_img
+        
+    def preprocess(self, region: Image.Image) -> Image.Image:
+        arr = cv2.cvtColor(np.array(region), cv2.COLOR_RGB2GRAY)
+        blur = cv2.GaussianBlur(arr, (3, 3), 0)
+        _, th = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        inv = cv2.bitwise_not(th)
+        up = cv2.resize(inv, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
+        return Image.fromarray(up)
+
+     
+
 
 
 
