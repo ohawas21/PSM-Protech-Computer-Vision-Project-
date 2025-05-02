@@ -70,6 +70,15 @@ class TableOCRExtractor:
         except Exception as e:
             logger.error("  PDF rendering error for %s: %s", pdf_path.name, e)
             return None
+        
+    def crop_columns(self, img: Image.Image) -> tuple[Image.Image, Image.Image]:
+        W, H = img.size
+        x1 = int(W * 0.20)
+        x2 = int(W * 0.60)
+        x3 = int(W * 0.98)
+        col2_img = img.crop((x1, 0, x2, H))
+        col3_img = img.crop((x2, 0, x3, H))
+        return col2_img, col3_img
 
 
 
