@@ -28,5 +28,12 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 # ────────────────────────────────────────────────────────────────────────────────
 
+# Suppress Camelot warnings for image-based pages
+warnings.filterwarnings('ignore', category=UserWarning)
+
+# Tesseract config: only digits and dot
+TESS_CONFIG = "--psm 7 --oem 3 -c tessedit_char_whitelist=0123456789."
+
+
 
 
