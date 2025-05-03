@@ -1,3 +1,20 @@
+\documentclass[11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{geometry}
+\geometry{margin=1in}
+
+\title{Workflow Summary and Data Documentation}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+
 \section{Workflow Summary and Data Documentation}
 
 \subsection{Workflow So Far}
@@ -44,9 +61,11 @@ Synthetic data was generated to simulate real business documents. Key details in
   \item \textbf{Tools Used}: Python scripts using libraries like Faker for content, PIL/OpenCV for image generation, and LaTeX/HTML templates for layout.
   \item \textbf{Data Types}: Simulated invoices, delivery notes, and product orders, including varying layouts and fonts to introduce variability.
   \item \textbf{Labeling Strategy}: Each synthetic document is labeled according to its document type for supervised classification.
-  \item \textbf{Volume}: Approximately 500–1000 synthetic documents generated to cover various business cases and formats.
+  \item \textbf{Volume}: Approximately 500--1000 synthetic documents generated to cover various business cases and formats.
   \item \textbf{Storage Format}: Data stored as PNG/JPG images with associated labels in CSV/JSON format for model training.
 \end{itemize}
 
 The synthetic data allows for early-stage prototyping and serves as a placeholder until production data is available under NDA.
+
+\end{document}
 
