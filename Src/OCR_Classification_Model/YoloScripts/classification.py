@@ -6,14 +6,14 @@ from sklearn.model_selection import train_test_split
 from ultralytics import YOLO
 
 # === CONFIGURATION ===
-BASE_DIR = r"C:\Users\ASUS\Desktop\PSE_project\PSM-Protech-Feasibility-Study\Src\OCR_Classification_Model\Dataset"
+BASE_DIR = r"/Users/mugeshvaikundamani/Library/Mobile Documents/com~apple~CloudDocs/THRo/PSE/PSM-Protech-Feasibility-Study/Src/OCR_Classification_Model/Dataset"  # Base directory for the dataset
 DATA_DIR = os.path.join(BASE_DIR, "final_annotation")  # Folder with images
 OUTPUT_DIR = os.path.join(BASE_DIR, "YOLO_Classification_Dataset")
-EPOCHS = 20
+EPOCHS = 10
 IMAGE_SIZE = 224
 BATCH_SIZE = 32
 MODEL_NAME = "yolov8l-cls.pt"  # Classification weights (e.g. yolov8s-cls.pt, yolov8m-cls.pt)
-DEVICE = 0  # GPU index (0 = first GPU), or 'cpu'
+DEVICE = 'mps'  # GPU index (0 = first GPU), or 'cpu'
 
 
 def main():
