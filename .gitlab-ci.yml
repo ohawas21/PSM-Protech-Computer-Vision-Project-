@@ -30,7 +30,7 @@ ocr_classification:
   allow_failure: true
   script:
     - echo "Preparing OCR Classification model preload test..."
-    - cd Src/OCR_Classification/Model
+    - cd Src/Model/OCR_Classification/Model
     - pip install --upgrade pip
     - echo "Pip upgraded"
     - pip install -r requirements.txt
