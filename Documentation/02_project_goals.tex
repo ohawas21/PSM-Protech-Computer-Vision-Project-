@@ -1,52 +1,42 @@
-\section{Project Goals}
+\documentclass[12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{geometry}
+\geometry{margin=1in}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{enumitem}
+\usepackage{hyperref}
 
-The goal of this project is to support PSM-Protech in automating the extraction and interpretation of technical data from feasibility reports and scanned documents. The project aims to reduce manual work in data processing and accelerate feasibility analysis by implementing a hybrid pipeline composed of OCR and machine learning components.
+\title{Chapter 1: Initial Situation}
+\author{AAI Project Team -- TH Rosenheim}
+\date{\today}
 
-This AI-driven solution will consist of:
+\begin{document}
+
+\maketitle
+
+\section{Initial Situation}
+
+The company \textbf{PSM-Protech} specializes in producing high-precision mechanical components and systems that demand accurate documentation and feasibility validation. A key challenge in their current workflow is the handling of large quantities of scanned technical documents, such as feasibility studies and product specifications, which are predominantly available as unstructured image-based PDFs.
+
+At present, relevant numerical data—such as performance values, tolerances, and dimensions—are manually extracted from these documents by engineers and sales personnel. This manual approach is inefficient, time-consuming, and error-prone, especially when processing multiple documents or when fast turnaround is required for project quotes or internal evaluations.
+
+Moreover, due to varied document formats, inconsistent layouts, and the presence of both typed and handwritten text, traditional parsing methods are ineffective. This further exacerbates operational inefficiencies and data inconsistencies across departments such as sales engineering, feasibility analysis, and quality assurance.
+
+To address these pain points, the project aims to develop a hybrid AI-powered pipeline that includes:
 \begin{itemize}
-    \item An \textbf{OCR-based table extraction system} that automatically detects and parses numerical data from scanned documents or image-based PDFs.
-    \item An \textbf{image classification module} that supports feasibility validation by recognizing key structural or visual patterns relevant to PSM’s engineering decisions.
+    \item an \textbf{OCR-based extraction component} for retrieving structured numerical data from scanned documents,
+    \item an \textbf{image classification component} to support decision-making and automate visual assessments relevant to feasibility evaluation.
 \end{itemize}
 
-These capabilities will contribute to the automation of manual review processes in engineering and sales, reduce human error, and improve responsiveness during customer inquiries and project scoping.
+This system will streamline internal processes, reduce manual workload, and improve data accuracy and accessibility. Together, these components form the foundation of a smarter, semi-automated feasibility study workflow for PSM-Protech.
 
-\subsection*{Goal Overview}
+This project was initiated by a team of six students from the \textit{Agile AI (AAI)} course at \textbf{TH Rosenheim}, in collaboration with PSM-Protech. A kickoff meeting was held at the company's premises on \textbf{March 31st}, during which the project context, challenges, and goals were discussed in detail. The meeting also included a tour of the company's facilities to better understand the environment in which the solution would be deployed.
 
-\begin{table}[ht]
-\centering
-\begin{tabular}{|p{1cm}|p{8cm}|p{4cm}|}
-\hline
-\textbf{ID} & \textbf{Goal Description} & \textbf{Success Criteria} \\
-\hline
-G1 & Automate extraction of tabular numerical data from feasibility reports & Successful OCR extraction on 80\%+ of target fields \\
-\hline
-G2 & Enable classification of component types from document images & Model achieves 85\%+ classification accuracy on test set \\
-\hline
-G3 & Integrate OCR and classification into a unified hybrid pipeline & End-to-end pipeline runs with minimal human intervention \\
-\hline
-G4 & Provide prototype that can be tested by stakeholders at PSM-Protech & Working software demo presented before review deadline \\
-\hline
-G5 & Document system behavior and architecture & Delivery of readable technical documentation and demo \\
-\hline
-\end{tabular}
-\caption{Project goals and success criteria}
-\label{tab:project_goals}
-\end{table}
+Following the meeting, both parties agreed to proceed with the project once a sample dataset was provided. However, as of today (\textbf{May 3rd}), the team has not yet received the promised dataset. This delay has affected the start of data-driven experimentation and model prototyping, which were planned for the early project phase.
 
-\subsection*{Rich Picture: System in Context}
+Despite this challenge, preliminary work on the OCR and table extraction pipeline has begun based on synthetic and public test data, and the team remains committed to delivering a solution aligned with the company’s needs.
 
-The following diagram illustrates the high-level interaction between actors (e.g., engineers, sales personnel), systems (e.g., OCR pipeline, document storage), and data flows. It serves to capture the context in which the AI solution will operate.
+\end{document}
 
-\begin{figure}[ht]
-    \centering
-    \includegraphics[width=\textwidth]{figures/rich_picture.png}
-    \caption{Rich Picture: Overview of system context and stakeholders}
-    \label{fig:rich_picture}
-\end{figure}
-
-\vspace{1em}
-\noindent
-In order to ensure that extracted geometric and dimensional values are aligned with industry expectations,
-the system should interpret and validate numerical data in accordance with international standards such as
-\textit{DIN EN ISO 1101}, which defines rules for geometrical tolerancing of form, orientation, location, and run-out.
 
