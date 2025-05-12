@@ -1,0 +1,14 @@
+# Numeric & table libs
+numpy<2,>=1.17.0
+pandas
+
+# Image processing
+Pillow
+opencv-python
+
+# PDF→image & OCR
+pdf2image
+pytesseract
+
+# Table extraction
+camelot-py[cv]
