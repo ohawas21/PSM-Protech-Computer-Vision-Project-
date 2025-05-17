@@ -1,4 +1,4 @@
-% technologies.tex – Technologies Used Document
+% technologies.tex – Technologies Used Document (corrected)
 \documentclass[a4paper,12pt]{article}
 \usepackage[utf8]{inputenc}
 \usepackage[T1]{fontenc}
@@ -16,25 +16,25 @@
 \section*{Technologies and Purpose}
 
 \begin{table}[h!]
-\centering
-\begin{tabular}{>{\raggedright}p{0.3\textwidth} >{\raggedright}p{0.6\textwidth}}
-\toprule
-\textbf{Technology} & \textbf{Usage} \
-\midrule
-Object Detection (YOLOv8) & Precise detection of gear symbols and annotation regions within blueprint images. \
-Classification Model & Categorization of extracted symbols into predefined classes for downstream processing. \
-Model Training & Implementation of optimized training pipelines leveraging GPU resources for faster convergence. \
-Python & OpenCV & Scripting and image pre-/post-processing tasks, including cropping and augmentations. \
-PyTorch / Ultralytics & Framework for defining, fine-tuning, and running deep-learning models for detection and classification. \
-Docker & Docker Compose & Containerization of services and environment reproducibility across development and deployment. \
-GitLab CI/CD & Automated build, testing, and deployment workflows for continuous integration and delivery. \
-Data Preprocessing (pandas, NumPy) & Tabular data manipulation, feature extraction, and numerical operations on annotation metadata. \
-Visualization (Matplotlib, Seaborn) & Plotting training metrics, data distributions, and performance insights. \
-Roboflow & Image labeling, dataset versioning, and annotation management for both synthetic and real datasets. \
-\bottomrule
-\end{tabular}
-\caption{Summary of technologies and their roles within the project.}
-\label{tab:technologies}
+  \centering
+  \begin{tabular}{>{\raggedright}p{0.3\textwidth} >{\raggedright}p{0.6\textwidth}}
+    \toprule
+    \textbf{Technology} & \textbf{Usage} \\
+    \midrule
+    Object Detection (YOLOv8) & Precise detection of gear symbols and annotation regions within blueprint images. \\
+    Classification Model & Categorization of extracted symbols into predefined classes for downstream processing. \\
+    Model Training & Implementation of optimized training pipelines leveraging GPU resources for faster convergence. \\
+    Python \& OpenCV & Scripting and image pre-/post-processing tasks, including cropping and augmentations. \\
+    PyTorch / Ultralytics & Framework for defining, fine-tuning, and running deep-learning models for detection and classification. \\
+    Docker \& Docker Compose & Containerization of services and environment reproducibility across development and deployment. \\
+    GitLab CI/CD & Automated build, testing, and deployment workflows for continuous integration and delivery. \\
+    Data Preprocessing (pandas, NumPy) & Tabular data manipulation, feature extraction, and numerical operations on annotation metadata. \\
+    Visualization (Matplotlib, Seaborn) & Plotting training metrics, data distributions, and performance insights. \\
+    Roboflow & Image labeling, dataset versioning, and annotation management for both synthetic and real datasets. \\
+    \bottomrule
+  \end{tabular}
+  \caption{Summary of technologies and their roles within the project.}
+  \label{tab:technologies}
 \end{table}
 
 \end{document}
