@@ -24,7 +24,7 @@ def main():
     parser.add_argument(
         '--model', '-m',
         type=str,
-        default='yolov11l.pt',
+        default='yolo11l.pt',
         help='Pretrained weights or checkpoint'
     )
     parser.add_argument(
@@ -66,8 +66,8 @@ def main():
     # Folders for splits
     TRAIN_IMAGES = os.path.join(PROJECT_ROOT, 'train', 'images')
     TRAIN_LABELS = os.path.join(PROJECT_ROOT, 'train', 'labels')
-    VAL_IMAGES   = os.path.join(PROJECT_ROOT, 'val',   'images')
-    VAL_LABELS   = os.path.join(PROJECT_ROOT, 'val',   'labels')
+    VAL_IMAGES   = os.path.join(PROJECT_ROOT, 'valid',   'images')
+    VAL_LABELS   = os.path.join(PROJECT_ROOT, 'valid',   'labels')
     TEST_IMAGES  = os.path.join(PROJECT_ROOT, 'test',  'images')
     TEST_LABELS  = os.path.join(PROJECT_ROOT, 'test',  'labels')
 
@@ -99,7 +99,7 @@ def main():
     if not os.path.isfile(DATA_YAML):
         sys.exit(f"❌ data.yaml not found at {DATA_YAML}")
 
-    for split in ('train', 'val', 'test'):
+    for split in ('train', 'valid', 'test'):
         img_dir = os.path.join(PROJECT_ROOT, split, 'images')
         lbl_dir = os.path.join(PROJECT_ROOT, split, 'labels')
         if not os.path.isdir(img_dir):
