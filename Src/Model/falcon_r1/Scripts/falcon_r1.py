@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-falcon_r1_v8.py
+train_with_psemodel.py
 
-Train YOLOv8-L with typical v8 augmentations on 1200×800 images,
-using a project root that contains:
+Train YOLOv11-Fast using the pretrained “pse-mp46x/2” (COCOn) checkpoint
+(mAP@50=92.4%, Precision=91.4%, Recall=78%) on 1200×800 images,
+with your standard project-root layout:
   • data.yaml
   • train/images, train/labels
   • valid/images, valid/labels
@@ -19,73 +20,88 @@ from ultralytics import YOLO
 def main():
     # ─── PARSE ARGS ───────────────────────────────────────────────────────────────
     parser = argparse.ArgumentParser(
-        description='Train YOLOv8-L with v8-style augmentations'
+        description='Train YOLOv11-Fast with pse-mp46x/2 pretrained weights'
     )
-    parser.add_argument('--root',  '-r', type=str, required=True,
-                        help='Path to project root (data.yaml, train/, valid/, test/)')
-    parser.add_argument('--model', '-m', type=str, default='yolov8l.pt',
-                        help='YOLOv8 weights file (e.g. yolov8l.pt)')
-    parser.add_argument('--epochs','-e', type=int, default=50,
-                        help='Number of training epochs')
-    parser.add_argument('--batch', '-b', type=int, default=8,
-                        help='Batch size')
-    parser.add_argument('--imgsz',          type=int, nargs=2,
-                        default=[1200,800], metavar=('WIDTH','HEIGHT'),
-                        help='Training image size: width height')
-    parser.add_argument('--device','-d',    type=str, default='0',
-                        help='GPU device ID or "cpu"')
-    parser.add_argument('--exp',   '-n',    type=str,
-                        default='yolov8l_aug_v1',
-                        help='Experiment name (folder under runs/train/)')
+    parser.add_argument(
+        '--root', '-r', type=str, required=True,
+        help='Path to project root (must contain data.yaml, train/, valid/, test/)'
+    )
+    parser.add_argument(
+        '--model', '-m', type=str, default='pse-mp46x/2',
+        help='Pretrained YOLOv11 model URL or local path (e.g. pse-mp46x/2)'
+    )
+    parser.add_argument(
+        '--epochs', '-e', type=int, default=50,
+        help='Number of training epochs'
+    )
+    parser.add_argument(
+        '--batch', '-b', type=int, default=8,
+        help='Batch size'
+    )
+    parser.add_argument(
+        '--imgsz', type=int, nargs=2, default=[1200, 800],
+        metavar=('WIDTH', 'HEIGHT'),
+        help='Training image size (width height)'
+    )
+    parser.add_argument(
+        '--device', '-d', type=str, default='0',
+        help='GPU device ID or "cpu"'
+    )
+    parser.add_argument(
+        '--exp', '-n', type=str, default='yolov11_fast_pse',
+        help='Experiment name (folder under runs/train/)'
+    )
     args = parser.parse_args()
 
-    # ─── SETUP ─────────────────────────────────────────────────────────────────────
+    # ─── CONFIG ──────────────────────────────────────────────────────────────────
     root      = os.path.abspath(args.root)
     data_yaml = os.path.join(root, 'data.yaml')
+
     splits = {
         'train': ('train/images', 'train/labels'),
         'valid': ('valid/images', 'valid/labels'),
         'test' : ('test/images',  'test/labels'),
     }
 
-    # Sanity checks
+    # ─── SANITY CHECKS ────────────────────────────────────────────────────────────
     if not os.path.isfile(data_yaml):
         sys.exit(f"❌ data.yaml not found at {data_yaml}")
-    for name, (imgs, lbls) in splits.items():
-        img_dir = os.path.join(root, imgs)
-        lbl_dir = os.path.join(root, lbls)
+    for name, (img_sub, lbl_sub) in splits.items():
+        img_dir = os.path.join(root, img_sub)
+        lbl_dir = os.path.join(root, lbl_sub)
         if not os.path.isdir(img_dir) or not os.path.isdir(lbl_dir):
             sys.exit(f"❌ Missing '{name}' dirs:\n  {img_dir}\n  {lbl_dir}")
+    # ──────────────────────────────────────────────────────────────────────────────
 
-    # ─── AUGMENTATION KWARGS ───────────────────────────────────────────────────────
+    # ─── AUGMENTATION SETTINGS ────────────────────────────────────────────────────
     AUG = dict(
-        mosaic        = True,    # enable Mosaic
-        mixup         = 0.15,    # mixup probability
-        copy_paste    = 0.10,    # copy-paste probability
-        hsv_h         = 0.015,   # HSV hue jitter
-        hsv_s         = 0.7,     # HSV saturation jitter
-        hsv_v         = 0.4,     # HSV value jitter
-        degrees       = 2.0,     # rotation
-        translate     = 0.08,    # translation
-        scale         = 0.5,     # scale jitter
-        shear         = 0.0,     # shear
-        perspective   = 0.0,     # perspective
-        flipud        = 0.0,     # vertical flip
-        fliplr        = 0.5,     # horizontal flip
+        mosaic      = True,
+        mixup       = 0.15,
+        hsv_h       = 0.015,
+        hsv_s       = 0.7,
+        hsv_v       = 0.4,
+        degrees     = 2.0,
+        translate   = 0.08,
+        scale       = 0.5,
+        shear       = 0.0,
+        perspective = 0.0,
+        flipud      = 0.0,
+        fliplr      = 0.5,
+        gray        = 0.0,    # disable grayscale for YOLOv11-Fast
     )
     # ──────────────────────────────────────────────────────────────────────────────
 
-    print(f"🚀 Starting YOLOv8-L training on {root}")
-    print(f" • data.yaml  : {data_yaml}")
-    print(f" • weights    : {args.model}")
-    print(f" • epochs     : {args.epochs}")
-    print(f" • batch size : {args.batch}")
-    print(f" • img size   : {tuple(args.imgsz)}")
-    print(f" • device     : {args.device}")
-    print(f" • exp name   : runs/train/{args.exp}\n")
+    print(f"🚀 Training YOLOv11-Fast on {root}")
+    print(f" • data.yaml    : {data_yaml}")
+    print(f" • pretrained   : {args.model} (COCOn checkpoint, mAP50=92.4%, P=91.4%, R=78%)")
+    print(f" • epochs       : {args.epochs}")
+    print(f" • batch size   : {args.batch}")
+    print(f" • img size     : {tuple(args.imgsz)}")
+    print(f" • device       : {args.device}")
+    print(f" • experiment   : runs/train/{args.exp}\n")
 
     # ─── TRAIN ─────────────────────────────────────────────────────────────────────
-    model = YOLO(args.model)  # load YOLOv8-L
+    model = YOLO(args.model)  # loads pse-mp46x/2
     results = model.train(
         data        = data_yaml,
         epochs      = args.epochs,
@@ -102,7 +118,7 @@ def main():
     )
 
     best = os.path.join(results.save_dir, 'weights', 'best.pt')
-    print(f"\n✅ Training finished! Best model at:\n   {best}")
+    print(f"\n✅ Training complete! Best model saved at:\n   {best}")
 
 if __name__ == '__main__':
     main()
