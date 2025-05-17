@@ -2,28 +2,65 @@
 # -*- coding: utf-8 -*-
 """
 Train YOLOv11-L object detector with grayscale augmentation (15%)
-on 1200×800 images, using your existing folder structure:
-  project_root/
-    data.yaml
-    train/
-      images/
-      labels/
-    val/
-      images/
-      labels/
-    test/
-      images/
-      labels/
+on 1200×800 images, using an arbitrary project root folder.
 """
 
 import os
 import sys
+import argparse
 from ultralytics import YOLO
 
 def main():
+    # ─── PARSE ARGS ───────────────────────────────────────────────────────────────
+    parser = argparse.ArgumentParser(
+        description='Train YOLOv11-L with grayscale augmentation (15%)'
+    )
+    parser.add_argument(
+        '--root', '-r',
+        type=str,
+        required=True,
+        help='Path to your project root (must contain data.yaml, train/, val/, test/)'
+    )
+    parser.add_argument(
+        '--model', '-m',
+        type=str,
+        default='yolov11l.pt',
+        help='Pretrained weights or checkpoint'
+    )
+    parser.add_argument(
+        '--epochs', '-e',
+        type=int,
+        default=50
+    )
+    parser.add_argument(
+        '--batch', '-b',
+        type=int,
+        default=8
+    )
+    parser.add_argument(
+        '--imgsz',
+        type=int,
+        nargs=2,
+        default=[1200, 800],
+        metavar=('WIDTH', 'HEIGHT'),
+        help='Training image size'
+    )
+    parser.add_argument(
+        '--device', '-d',
+        type=str,
+        default='0',
+        help='GPU device (e.g. "0") or "cpu"'
+    )
+    parser.add_argument(
+        '--exp', '-n',
+        type=str,
+        default='yolov11l_gray15',
+        help='Experiment name (run folder under runs/train/)'
+    )
+    args = parser.parse_args()
+
     # ─── CONFIG ──────────────────────────────────────────────────────────────────
-    # Change these paths if your structure lives elsewhere
-    PROJECT_ROOT = os.path.abspath(os.path.dirname(__file__))
+    PROJECT_ROOT = os.path.abspath(args.root)
     DATA_YAML    = os.path.join(PROJECT_ROOT, 'data.yaml')
 
     # Folders for splits
@@ -34,15 +71,13 @@ def main():
     TEST_IMAGES  = os.path.join(PROJECT_ROOT, 'test',  'images')
     TEST_LABELS  = os.path.join(PROJECT_ROOT, 'test',  'labels')
 
-    # YOLO & training Hyperparameters
-    MODEL_NAME   = 'yolov11l.pt'     # or path to your custom YOLOv11L weights
-    EPOCHS       = 50
-    BATCH_SIZE   = 8                 # reduce if you hit OOM
-    IMGSZ        = (1200, 800)       # (width, height)
-    DEVICE       = '0'               # GPU index (or 'cpu')
-    EXP_NAME     = 'yolov11l_gray15' # run folder name
+    MODEL_NAME   = args.model
+    EPOCHS       = args.epochs
+    BATCH_SIZE   = args.batch
+    IMGSZ        = tuple(args.imgsz)
+    DEVICE       = args.device
+    EXP_NAME     = args.exp
 
-    # Augmentation parameters
     AUG_KWARGS = dict(
         mosaic      = True,
         mixup       = 0.15,
@@ -56,17 +91,14 @@ def main():
         perspective = 0.0,
         flipud      = 0.0,
         fliplr      = 0.5,
-        grayscale   = 0.15,  # 15% probability
+        grayscale   = 0.15,
     )
     # ──────────────────────────────────────────────────────────────────────────────
 
-
-    # ─── SANITY CHECKS ─────────────────────────────────────────────────────────────
-    # Ensure data.yaml is present
+    # ─── SANITY CHECKS ────────────────────────────────────────────────────────────
     if not os.path.isfile(DATA_YAML):
         sys.exit(f"❌ data.yaml not found at {DATA_YAML}")
 
-    # Ensure each split has both images and labels subfolders
     for split in ('train', 'val', 'test'):
         img_dir = os.path.join(PROJECT_ROOT, split, 'images')
         lbl_dir = os.path.join(PROJECT_ROOT, split, 'labels')
@@ -75,7 +107,6 @@ def main():
         if not os.path.isdir(lbl_dir):
             sys.exit(f"❌ Missing label folder: {lbl_dir}")
     # ──────────────────────────────────────────────────────────────────────────────
-
 
     # ─── TRAINING ─────────────────────────────────────────────────────────────────
     print("🚀 Starting YOLOv11-L training with grayscale augmentation (15%)")
@@ -88,26 +119,22 @@ def main():
     print(f"• Device       : {DEVICE}")
     print(f"• Experiment   : runs/train/{EXP_NAME}")
 
-    # Load YOLOv11 model
     model = YOLO(MODEL_NAME)
-
-    # Train with augmentations
     results = model.train(
-        data         = DATA_YAML,
-        epochs       = EPOCHS,
-        imgsz        = IMGSZ,
-        batch        = BATCH_SIZE,
-        device       = DEVICE,
-        project      = PROJECT_ROOT,
-        name         = EXP_NAME,
-        exist_ok     = False,     # error if 'runs/train/EXP_NAME' exists
-        save         = True,
-        save_period  = -1,        # only best + final
-        augment      = True,
-        augment_kwargs = AUG_KWARGS,
+        data            = DATA_YAML,
+        epochs          = EPOCHS,
+        imgsz           = IMGSZ,
+        batch           = BATCH_SIZE,
+        device          = DEVICE,
+        project         = PROJECT_ROOT,
+        name            = EXP_NAME,
+        exist_ok        = False,
+        save            = True,
+        save_period     = -1,
+        augment         = True,
+        augment_kwargs  = AUG_KWARGS,
     )
 
-    # Report best checkpoint
     best_ckpt = os.path.join(results.save_dir, 'weights', 'best.pt')
     print(f"\n✅ Training complete! Best model: {best_ckpt}")
 
