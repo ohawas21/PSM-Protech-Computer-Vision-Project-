@@ -1,0 +1,46 @@
+% constraints.tex – Project Constraints Document
+\documentclass[a4paper,12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{enumitem}
+\usepackage{geometry}
+\geometry{margin=1in}
+\title{Project Constraints}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section*{Overview}
+This document outlines the primary constraints encountered during the development
+of our computer vision pipeline for extracting information from gear-drawing blueprints.
+
+\section*{Constraints}
+\begin{enumerate}[left=0pt]
+\item \textbf{Blueprint Quality Constraints}
+\begin{itemize}
+\item Variability in image resolution, contrast, and noise levels can impair detection.
+\item Missing or faint edges and non-uniform lighting can lead to incorrect feature extraction.
+\end{itemize}
+
+\item \textbf{Model Hallucination Risks}
+\begin{itemize}
+\item Absence of explicit bounding boxes around some parts may cause the model to hallucinate information.
+\item Overlapping or poorly-defined regions can trigger false positives in symbol or value detection.
+\end{itemize}
+
+\item \textbf{Annotation Effort Constraints}
+\begin{itemize}
+\item Manual annotation of large crops (extracting the full part) is labor-intensive.
+\item Manual annotation of small crops (detecting bounding boxes around embedded information) doubles the effort.
+\item Ensuring consistency across annotators and iterations significantly increases time requirements.
+\end{itemize}
+
+\item \textbf{Computational Power Constraints}
+\begin{itemize}
+\item Training deep-learning models requires GPU resources, which may not always be readily available.
+\item Limited access to high-performance hardware can extend training and iteration cycles.
+\end{itemize}
+\end{enumerate}
+
+\end{document}
