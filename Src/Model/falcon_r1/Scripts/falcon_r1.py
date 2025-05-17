@@ -4,7 +4,7 @@
 fine_tiny10.py
 
 Fine-tune YOLOv8-L on a very small dataset (10 images) using aggressive augmentation
-and transfer learning via freezing the backbone.
+and transfer learning via freezing the backbone, then run detection and evaluation on the test set.
 
 Usage:
     python3 fine_tiny10.py --root /path/to/project_root \
@@ -26,9 +26,10 @@ import sys
 import argparse
 from ultralytics import YOLO
 
+
 def main():
     parser = argparse.ArgumentParser(
-        description='Fine-tune YOLOv8 on tiny dataset (10 images)'
+        description='Fine-tune YOLOv8 on tiny dataset (10 images) and evaluate on test set'
     )
     parser.add_argument(
         '--root', '-r',
@@ -60,7 +61,7 @@ def main():
         nargs=2,
         default=[1200, 800],
         metavar=('WIDTH', 'HEIGHT'),
-        help='Training image size'
+        help='Training and inference image size'
     )
     parser.add_argument(
         '--lr',
@@ -89,14 +90,13 @@ def main():
     # Sanity checks
     if not os.path.isfile(data_yaml):
         sys.exit(f"❌ data.yaml not found at {data_yaml}")
-    splits = ['train', 'valid', 'test']
-    for split in splits:
+    for split in ['train', 'valid', 'test']:
         img_dir = os.path.join(root, split, 'images')
         lbl_dir = os.path.join(root, split, 'labels')
         if not os.path.isdir(img_dir) or not os.path.isdir(lbl_dir):
             sys.exit(f"❌ Missing folders for '{split}': {img_dir}, {lbl_dir}")
 
-    # Load model and prepare training
+    # Load model
     model = YOLO(args.model)
 
     # Aggressive augmentation & transfer learning settings
@@ -124,7 +124,7 @@ def main():
     print(f" • experiment  : runs/train/{args.exp}\n")
 
     # Train with freezing backbone
-    results = model.train(
+    train_results = model.train(
         data          = data_yaml,
         epochs        = args.epochs,
         imgsz         = tuple(args.imgsz),
@@ -140,8 +140,36 @@ def main():
         **augment_kwargs
     )
 
-    best_ckpt = os.path.join(results.save_dir, 'weights', 'best.pt')
-    print(f"\n✅ Fine-tuning complete! Best model saved at:\n   {best_ckpt}")
+    best_ckpt = os.path.join(train_results.save_dir, 'weights', 'best.pt')
+    print(f"\n✅ Fine-tuning complete! Best model saved at:\n   {best_ckpt}\n")
+
+    # Run detection on test set
+    test_source = os.path.join(root, 'test', 'images')
+    print(f"🚀 Running detection on test images: {test_source}")
+    _ = model.predict(
+        source      = test_source,
+        imgsz       = tuple(args.imgsz),
+        conf        = 0.25,
+        iou         = 0.45,
+        device      = args.device,
+        save        = True,
+        project     = root,
+        name        = f"{args.exp}_test_detect",
+        exist_ok    = True
+    )
+    print(f"✅ Detection images saved under runs/detect/{args.exp}_test_detect/\n")
+
+    # Evaluate on test set
+    print("🚀 Evaluating on test set...")
+    val_results = model.val(
+        data        = data_yaml,
+        split       = 'test',
+        imgsz       = tuple(args.imgsz),
+        batch       = args.batch,
+        device      = args.device
+    )
+    # The .val() method prints metrics; optionally capture them as dict
+    print("✅ Evaluation complete!")
 
 if __name__ == '__main__':
     main()
