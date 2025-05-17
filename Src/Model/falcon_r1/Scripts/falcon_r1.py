@@ -10,6 +10,8 @@ with your standard project-root layout:
   • train/images, train/labels
   • valid/images, valid/labels
   • test/images,  test/labels
+
+Note: YOLOv11-Fast currently does not support built-in grayscale augmentation via API.
 """
 
 import os
@@ -24,11 +26,11 @@ def main():
     )
     parser.add_argument(
         '--root', '-r', type=str, required=True,
-        help='Path to project root (must contain data.yaml, train/, valid/, test/)'
+        help='Path to project root (must contain data.yaml, train/, valid/, test/)' 
     )
     parser.add_argument(
         '--model', '-m', type=str, default='pse-mp46x/2',
-        help='Pretrained YOLOv11 model URL or local path (e.g. pse-mp46x/2)'
+        help='Pretrained YOLOv11-Fast model URL or local path (e.g. pse-mp46x/2)'
     )
     parser.add_argument(
         '--epochs', '-e', type=int, default=50,
@@ -87,7 +89,6 @@ def main():
         perspective = 0.0,
         flipud      = 0.0,
         fliplr      = 0.5,
-        gray        = 0.0,    # disable grayscale for YOLOv11-Fast
     )
     # ──────────────────────────────────────────────────────────────────────────────
 
