@@ -1,0 +1,130 @@
+@startuml
+
+title ML Pipeline for Tolerance Evaluation
+
+' Optional styling to improve readability
+skinparam packageTitleFontSize 14
+skinparam packageFontSize 12
+skinparam classFontSize 12
+skinparam arrowFontSize 11
+skinparam shadowing false
+skinparam roundCorner 10
+
+legend right
+  Sx = Step x in the overall process
+endlegend
+
+' =========================
+'  PIPELINE ORCHESTRATION
+' =========================
+package "Pipeline Orchestration" {
+  class PipelineManager {
+    +runPipeline(): None
+  }
+}
+
+' =========================
+'  DATA LAYER
+' =========================
+package "Data Layer" {
+  abstract class FileParser {
+    +parse(filePath: str): RawData
+  }
+  class PDFParser {
+    +parsePDF(filePath: str): RawData
+  }
+  class CADParser {
+    +parseCAD(filePath: str): RawData
+  }
+
+  ' Inheritance
+  PDFParser -|> FileParser
+  CADParser -|> FileParser
+}
+
+' =========================
+'  DATA PROCESSING
+' =========================
+package "Data Processing" {
+  class DataIngestion {
+    +ingestData(sourcePath: str): RawData
+  }
+  class DataPreprocessing {
+    +cleanData(rawData: RawData): CleanData
+    +normalizeData(cleanData: CleanData): NormalizedData
+  }
+  class BlueprintExtractionModel {
+    +extractBlueprintData(filePath: str): StructuredData
+  }
+}
+
+' =========================
+'  FEATURE ENGINEERING
+' =========================
+package "Feature Engineering" {
+  class FeatureEngineering {
+    +extractFeatures(data: NormalizedData): FeatureVector
+  }
+}
+
+' =========================
+'  MODELING
+' =========================
+package "Modeling" {
+  class YOLODetectionModel {
+    +trainYOLO(...): Model
+    +predictYOLO(...): BoundingBoxes
+  }
+  class SymbolClassificationModel {
+    +trainSymbolClassifier(...): Model
+    +predictSymbols(...): SymbolPrediction
+  }
+  class OCRModel {
+    +trainOCR(...): Model
+    +extractText(...): TextData
+  }
+  class RuleBasedFeasibilityModel {
+    +applyRules(...): FeasibilityResult
+  }
+}
+
+' =========================
+'  DEPLOYMENT & MONITORING
+' =========================
+package "Deployment" {
+  class ModelDeployment {
+    +packageModel(...): DeploymentPackage
+    +deployModel(...): Endpoint
+  }
+}
+
+package "Monitoring" {
+  class Monitoring {
+    +monitorPerformance(...): PerformanceMetrics
+    +triggerRetraining(): None
+  }
+}
+
+' =========================
+'  RELATIONSHIPS (SEQUENCE)
+' =========================
+PipelineManager -> DataIngestion : S1
+DataIngestion -> FileParser : S2
+DataIngestion -> BlueprintExtractionModel : S3 (extract blueprint)
+
+BlueprintExtractionModel -> DataPreprocessing : S4 (preprocess)
+DataPreprocessing -> FeatureEngineering : S5 (engineer features)
+
+FeatureEngineering -> YOLODetectionModel : S6 (object detection)
+YOLODetectionModel -> SymbolClassificationModel : S7 (classify symbols)
+YOLODetectionModel -> OCRModel : S8 (extract text)
+
+SymbolClassificationModel -> RuleBasedFeasibilityModel : S9
+OCRModel -> RuleBasedFeasibilityModel : S9
+YOLODetectionModel -> RuleBasedFeasibilityModel : S9
+
+RuleBasedFeasibilityModel -> ModelDeployment : S10
+ModelDeployment -> Monitoring : S11
+Monitoring --> PipelineManager : (feedback loop)
+
+@enduml
