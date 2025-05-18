@@ -16,11 +16,9 @@
 
 \begin{table}[h!]
   \centering
-  % Simplified table using standard \hline to avoid booktabs midrule issues
-  \begin{tabular}{|>{\raggedright}p{0.3\textwidth}|>{\raggedright}p{0.6\textwidth}|}
-    \hline
+  % Plain two-column table without rules to avoid alignment issues
+  \begin{tabular}{p{0.3\textwidth} p{0.6\textwidth}}
     \textbf{Technology} & \textbf{Usage} \\
-    \hline
     Object Detection (YOLOv8) & Precise detection of gear symbols and annotation regions within blueprint images. \\
     Classification Model & Categorization of extracted symbols into predefined classes for downstream processing. \\
     Model Training & Implementation of optimized training pipelines leveraging GPU resources for faster convergence. \\
@@ -31,7 +29,6 @@
     Data Preprocessing (pandas, NumPy) & Tabular data manipulation, feature extraction, and numerical operations on annotation metadata. \\
     Visualization (Matplotlib, Seaborn) & Plotting training metrics, data distributions, and performance insights. \\
     Roboflow & Image labeling, dataset versioning, and annotation management for both synthetic and real datasets. \\
-    \hline
   \end{tabular}
   \caption{Summary of technologies and their roles within the project.}
   \label{tab:technologies}
