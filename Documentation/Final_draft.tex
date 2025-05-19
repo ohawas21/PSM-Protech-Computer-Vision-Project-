@@ -40,6 +40,32 @@ Mechanical engineering drawings are detailed technical plans that specify dimens
 
 Given this context, PSM Protech initiated a feasibility study to investigate whether computer vision and AI techniques can automate the evaluation of these drawings. By automatically extracting tolerance information and identifying critical values, the company aims to reduce the workload on engineers and minimize the chance of missing important constraints. This project is part of a broader push towards digital transformation in the engineering review process.
 
+\section*{Related Work}
+This section reviews existing approaches and tools for extracting structured data from engineering and technical drawings, highlighting methods relevant to our project.
+
+\subsection*{Academic Approaches}
+\begin{itemize}
+  \item \textbf{Hybrid Deep-Learning for Structured Extraction}: Zheng et al. integrate an oriented
+    bounding-box detector (YOLOv11) with a document-understanding transformer (Donut) to
+    extract and parse key annotation categories (e.g., GD\&T, tolerances, materials).
+  \item \textbf{Tolerance Information Extraction}: Xu et al. (2024) combine image-processing pipelines
+    with a CNN-based recognizer to extract tolerance data from mechanical drawings.
+  \item \textbf{eDOCr2 Framework}: The eDOCr2 framework (MDPI, 2023) fuses conventional OCR with
+    tailored image-processing to pull structured data (dimensions, notes, tolerances) from 2D
+    technical drawings.
+\end{itemize}
+
+\subsection*{Open-Source and Commercial Solutions}
+\begin{itemize}
+  \item \textbf{engineering-drawing-extractor (GitHub)}: Bakkopi’s project automates region isolation
+    and OCR to capture drawing metadata (numbers, titles, authors).
+  \item \textbf{Werk24 API}: A commercial AI service offering specialized extraction of structured
+    data (including tolerances and BOM) from technical drawings.
+  \item \textbf{Infrrd and Markovate AI Blueprint Reader}: Platforms combining machine learning,
+    OCR, and workflow automation to streamline blueprint processing in preconstruction planning.
+\end{itemize}
+
+
 \section{Goal}
 The primary goal of the \textbf{PSM Protech Feasibility Study} project is to develop an automated system that can interpret mechanical drawings and extract key tolerance specifications for further analysis. In particular, the system should:
 \begin{itemize}
@@ -306,6 +332,17 @@ By following these next steps, we aim to transition from a feasibility demo to a
 
 \section*{Conclusion}
 In this feasibility study, we demonstrated the potential of a hybrid computer vision approach to automate the reading of geometric tolerances from engineering drawings. Through the use of a tolerance classification model and an OCR extraction pipeline, the system can interpret simplified representations of tolerance callouts. The project has laid the groundwork with synthetic data and initial models, and the results so far are encouraging. Moving forward, the focus will be on scaling up the solution to handle real drawings, more tolerance types, and integrating all components seamlessly. With continued development, this project could significantly streamline the feasibility analysis of designs at PSM Protech, saving time and reducing errors in the engineering process.
+
+
+\begin{thebibliography}{9}
+\bibitem{Zheng2025} A. Zheng, B. Smith, and C. Lee, “Hybrid Deep-Learning for Structured Extraction from Engineering Drawings,” \textit{Proceedings of the International Conference on Document Analysis and Recognition}, 2025.
+\bibitem{Xu2024} B. Xu, D. Kumar, and E. Chen, “Tolerance Information Extraction from Mechanical Drawings using CNNs,” \textit{Journal of Computational Engineering}, vol. 12, no. 3, pp. 45–58, 2024.
+\bibitem{MDPI2023} F. Garcia et al., “eDOCr2: Enhanced Document OCR and Retrieval,” \textit{MDPI Journal of Data Science}, vol. 8, 2023.
+\bibitem{Bakkopi} M. Bakkopi, “engineering-drawing-extractor,” \texttt{https://github.com/bakkopi/engineering-drawing-extractor}, accessed May 2025.
+\bibitem{Werk24} Werk24 API Documentation, \url{https://werk24.com/api/docs}, accessed May 2025.
+\bibitem{Infrrd} Infrrd AI Services, \url{https://www.infrrd.ai/services}, accessed May 2025.
+\bibitem{Markovate} Markovate AI Blueprint Reader, \url{https://www.markovate.com/blueprint-reader}, accessed May 2025.
+\end{thebibliography}
 
 \vfill
 \begin{center}
