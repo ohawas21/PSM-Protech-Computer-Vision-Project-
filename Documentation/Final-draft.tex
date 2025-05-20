@@ -4,6 +4,7 @@
 \usepackage{caption}
 \usepackage{subcaption}
 \usepackage{hyperref}
+\usepackage{amsmath}
 \hypersetup{colorlinks=true, urlcolor=blue, linkcolor=blue}
 \usepackage{float}
 
@@ -27,9 +28,9 @@ This document provides a comprehensive technical overview of the PSM Protech Fea
 \newpage
 
 \section{Initial Situation}
-PSM Protech is a leading manufacturer of high-precision mechanical components and assemblies, serving aerospace, medical, and industrial sectors. The company specializes in tight-tolerance CNC machining, rapid prototyping, and comprehensive quality assurance to deliver complex parts with consistent accuracy and reliability.
+PSM Protech is a leading manufacturer of high-precision mechanical components and assemblies serving the aerospace, medical, and industrial sectors. The company specializes in tight tolerance CNC machining, rapid prototyping, and comprehensive quality assurance to deliver complex parts with consistent accuracy and reliability.
 
-Mechanical engineering drawings are detailed technical plans that specify dimensions and tolerances for manufactured parts. Each drawing can contain hundreds of annotations defining allowable variation in part geometry (known as GD\&T -- \emph{Geometric Dimensioning and Tolerancing} specifications). Traditionally, engineers at PSM Protech manually review these drawings to assess feasibility of production, a process that is time-consuming (2 weeks) and prone to human error. For example, Figure~\ref{fig:example_drawing} shows an engineering drawing of a mechanical part with numerous GD\&T callouts (tolerance symbols and values referencing datums). Manually checking up to 500 individual tolerance values in such a drawing, often across multiple design revisions, is tedious and carries the risk of overlooking critical requirements.
+Mechanical engineering drawings are detailed technical plans that specify dimensions and tolerances for manufactured parts. Each drawing can contain hundreds of annotations that define the allowable variation in part geometry (known as GD\&T -- \emph{Geometric Dimensioning and Tolerancing} specifications). Traditionally, engineers at PSM Protech manually review these drawings to assess feasibility of production, a process that is time-consuming (2 weeks) and prone to human error. For example, Figure~\ref{fig:example_drawing} shows an engineering drawing of a mechanical part with numerous GD\&T callouts (tolerance symbols and values referencing datums). Manually checking up to 500 individual tolerance values in such a drawing, often across multiple design revisions, is tedious and carries the risk of overlooking critical requirements.
 
 \begin{figure}[h!]
 \centering
@@ -71,27 +72,27 @@ The primary goal of the \textbf{PSM Protech Feasibility Study} project is to dev
 \begin{itemize}
   \item \textbf{Automatically identify geometric tolerance annotations} (GD\&T feature control frames and related text) in a given drawing.
   \item \textbf{Classify the type of each tolerance} (e.g., flatness, cylindricity, etc.) to understand what kind of constraint it represents.
-  \item \textbf{Extract the numerical tolerance values} associated with each annotation with high accuracy.
-  \item \textbf{Aggregate and present the extracted data} in a structured format for review, enabling automatic checking against feasibility criteria.
+  \item \textbf{Extract the numerical tolerance values} associated with each annotation with high precision.
+  \item \textbf{Aggregate and present the extracted data} in a structured format for review, allowing automatic check against feasibility criteria.
   \item \textbf{Highlight critical tolerances or changes} between drawing revisions, so engineers can quickly focus on potential problem areas.
 \end{itemize}
 
-Ultimately, achieving these goals would mean that when a new part drawing or an updated revision is received, the system could swiftly parse it and produce an excel report of all tolerance requirements. This would greatly speed up the feasibility assessment phase and allow engineers to concentrate on addressing the critical issues rather than manually transcribing data.
+Ultimately, achieving these goals would mean that when a new part drawing or an updated revision is received, the system could quickly parse it and produce an excel report of all tolerance requirements. This would greatly speed up the feasibility assessment phase and allow engineers to concentrate on addressing the critical issues rather than manually transcribing the data.
 
 \begin{center}
-  \includegraphics[width=\textwidth]{Rich_Picture.png}\\[5mm]
+  \includegraphics[width=\textwidth]{Rich-Picure.drawio.png}\\[5mm]
   % “5mm” of extra vertical space before the next line
   This is the rich picture.
 \end{center}
 
 \section{Methodology}
-To accomplish the project goals, our approach combines computer vision, deep learning, and optical character recognition (OCR) in a hybrid pipeline. The methodology has been structured in iterative phases, focusing on building and validating individual models which will later be integrated. The core idea is to let machine learning handle visual recognition tasks (like identifying symbol types) and use OCR techniques for reading text (numeric values), playing to the strengths of each technique. 
+To accomplish project goals, our approach combines computer vision, deep learning, and optical character recognition (OCR) in a hybrid pipeline. The methodology has been structured in iterative phases, focusing on building and validating individual models, which will later be integrated. The core idea is to let machine learning handle visual recognition tasks (such as identifying symbol types) and use OCR techniques to read text (numerical values), playing to the strengths of each technique. 
 
 At a high level, the methodology is as follows:
 \begin{enumerate}
-    \item \textbf{Data Preprocessing}: Anotating each Image based on what the model expects for Training. Detailed explanation can be found in (Section 6).
-    \item \textbf{Tolerance Models}: We employ four models—\texttt{falcon\_r1}, \texttt{falcon\_r2}, \texttt{falcon\_r3}, and \texttt{falcon\_r4}. We have different model for different purpose ranging from cropping to classification. We train a deep learning model to recognize the type of tolerance from an image of its symbol (for example, distinguishing a flatness symbol from a cylindricity symbol). We fine-tuned pre-trained YOLOv8 and subsequently YOLOv11 convolutional neural networks in classification mode on our dataset of labeled tolerance symbol images. For more information, refer to Section~6.
-    \item \textbf{Containerization}: We plan to containerize the system using Docker. Additionally, we lan the combination of the classification model and OCR extraction into a single end-to-end system. In a complete workflow, the system would scan an entire drawing, detect regions that contain tolerance information (e.g., using object detection techniques), classify each detected region's tolerance type, and apply OCR to extract the corresponding value(s).
+    \item \textbf{Data Preprocessing}: Annotating each image based on what the model expects for training. Detailed explanation can be found in (Section 6).
+    \item \textbf{Tolerance Models}: We employ four models—\texttt{falcon\_r1}, \texttt{falcon\_r2}, \texttt{falcon\_r3}, and \texttt{falcon\_r4}. We have different models for different purposes ranging from cropping to classification. We train a deep learning model to recognize the type of tolerance from an image of its symbol (for example, distinguishing a flatness symbol from a cylindricity symbol). We fine-tuned pre-trained YOLOv8 and subsequently YOLOv11 convolutional neural networks in classification mode on our dataset of labeled tolerance symbol images. For more information, refer to Section~6.
+    \item \textbf{Containerization}: We plan to containerize the system using Docker. Additionally, we plan the combination of the classification model and OCR extraction into a single end-to-end system. In a complete workflow, the system would scan an entire drawing, detect regions that contain tolerance information (e.g., using object detection techniques), classify each detected region's tolerance type, and apply OCR to extract the corresponding value(s).
     \item \textbf{Iteration and Validation}: Evaluate the performance of each component on test images, identify weaknesses, and improve the methodology. This includes refining the synthetic data generation, tuning model hyperparameters, and improving image preprocessing steps for OCR. Future iterations will incorporate real-world drawing data to validate the approach in practice.
 \end{enumerate}
 
@@ -144,7 +145,7 @@ The tolerance classification model is based on the YOLOv8 architecture, configur
 
 \paragraph{Training Procedure:} The training process for the classifier is encapsulated in the \verb|classification.py| script. The key steps are:
 \begin{enumerate}
-    \item \textbf{Dataset Parsing}: The script scans the dataset directory (containing our annotated synthetic images). It automatically infers class names by looking at the filename prefixes (each image file is named with its class, e.g., \verb|flatness_01.png|, \verb|cylindricity_sample2.png|, etc.). All images are grouped by class label.
+    \item \textbf{Dataset Parsing}: The script scans the dataset directory (containing our annotated synthetic images). It automatically infers class names by looking at the filename prefixes (each image file is named with its class, e.g., \verb|form_flatness.png|, \verb|form_cylindricity.png|, etc.). All images are grouped by class label.
     \item \textbf{Train-Validation Split}: The gathered images for each class are split into a training set and a validation set (80\% train, 20\% val). This ensures that we can evaluate the model’s generalization on images it wasn’t trained on. The script creates a directory structure expected by YOLO (separate \verb|train/| and \verb|val/| folders, each containing subfolders for each class with the respective images).
     \item \textbf{Model Training}: We load a YOLOv8 classification model with pre-trained weights (in our case, we specified the \verb|yolov8l-cls.pt| model, which is a large variant for classification). The training is then executed via the Ultralytics API call \verb|model.train(...)|, specifying parameters such as number of epochs (we used 10 epochs as an initial training period), image size (224 pixels), batch size (32), and the device (using GPU if available). The model automatically learns to distinguish the classes by adjusting its internal weights on the training images. During training, we can see progress metrics such as training/validation accuracy and loss.
     \item \textbf{Model Saving}: After training, the best-performing model weights (based on validation loss) are saved to disk (the script will output the path, typically \verb|runs/classify/train/weights/best.pt| or similar). This saved model can later be loaded for inference on new images.
@@ -224,7 +225,7 @@ Due to delays in receiving customer-provided blueprints, we adopted an alternati
   \label{fig:geom_tol}
 \end{figure}
 
-\section*{Deliverables}
+\section{Deliverables}
 \begin{table}[H]
   \centering
   \begin{tabular}{p{0.45\textwidth} p{0.45\textwidth}}
@@ -312,7 +313,7 @@ These examples give us confidence that the pipeline is extracting the core numer
 \subsection*{Interpreting the Feasibility}
 The results so far demonstrate that, under controlled conditions, the approach of using a classifier plus OCR is feasible. We have effectively created a digital reader that can look at a simplified drawing snippet and tell us “this is a flatness tolerance of value 0.05 mm,” which is the kind of interpretation we ultimately want for real drawings. The next step will be to test how well this performance translates to more realistic scenarios.
 
-One metric we consider is the end-to-end accuracy: the percentage of tolerance annotations on a drawing that the system can correctly interpret (both type and value). On synthetic data, this is nearly 100\%. On real data, our target is to get this as high as possible (ideally >90\%) to consider the system viable. Achieving that will require addressing the constraints mentioned earlier.
+One metric we consider is the end-to-end accuracy: the percentage of tolerance annotations on a drawing that the system can correctly interpret (both type and value). On synthetic data, this is nearly 100\%. On real data, our target is to get this as high as possible (ideally \textgreater 90\%) to consider the system viable. Achieving that will require addressing the constraints mentioned earlier.
 
 \section{Next Steps}
 With a foundational solution in place and positive initial results, the project will now move into subsequent phases to enhance and expand the system. The next steps include:
@@ -330,7 +331,7 @@ With a foundational solution in place and positive initial results, the project 
 
 By following these next steps, we aim to transition from a feasibility demo to a more robust prototype. The ultimate vision is a system integrated into PSM Protech’s workflow, where an engineer can upload a drawing and receive an automated report highlighting tolerance information. Each step above brings us closer to that goal: improving accuracy, broadening scope, and ensuring the solution is practical in a real-world setting.
 
-\section*{Conclusion}
+\section{Conclusion}
 In this feasibility study, we demonstrated the potential of a hybrid computer vision approach to automate the reading of geometric tolerances from engineering drawings. Through the use of a tolerance classification model and an OCR extraction pipeline, the system can interpret simplified representations of tolerance callouts. The project has laid the groundwork with synthetic data and initial models, and the results so far are encouraging. Moving forward, the focus will be on scaling up the solution to handle real drawings, more tolerance types, and integrating all components seamlessly. With continued development, this project could significantly streamline the feasibility analysis of designs at PSM Protech, saving time and reducing errors in the engineering process.
 
 
@@ -350,3 +351,4 @@ In this feasibility study, we demonstrated the potential of a hybrid computer vi
 \end{center}
 
 \end{document}
+
