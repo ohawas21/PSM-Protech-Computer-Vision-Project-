@@ -1,18 +1,4 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-train_custom_detector.py
-
-Train a custom CNN object detector on polygon-annotated data by converting
-polygons to bounding boxes. For use with very small datasets (e.g., 10 images).
-
-Usage:
-    python3 train_custom_detector.py --root /path/to/project_root \
-        [--epochs 30] [--batch 4] [--lr 1e-4] [--device 0] [--exp custom_cnn]
-"""
-
 import os
-import sys
 import argparse
 import torch
 import torch.nn as nn
@@ -24,10 +10,8 @@ from torch.utils.data import Dataset, DataLoader
 import torchvision.transforms as T
 
 IMG_WIDTH, IMG_HEIGHT = 1200, 800
-NUM_CLASSES = 1  # only one class
 
-# ───────────────────────────────────────────────────────
-# Dataset class supporting polygon to box
+# Dataset for polygon-based YOLO labels
 class PolygonToBoxDataset(Dataset):
     def __init__(self, img_dir, lbl_dir, transform=None):
         self.img_paths = sorted(glob(os.path.join(img_dir, '*.jpg')))
@@ -45,7 +29,6 @@ class PolygonToBoxDataset(Dataset):
         with open(self.lbl_paths[idx], 'r') as f:
             line = f.readline().strip()
             coords = list(map(float, line.strip().split()))
-            cls_id = int(coords[0])
             points = np.array(coords[1:]).reshape(-1, 2)
             x_min = np.min(points[:, 0]) * IMG_WIDTH
             y_min = np.min(points[:, 1]) * IMG_HEIGHT
@@ -58,31 +41,66 @@ class PolygonToBoxDataset(Dataset):
         return img, box
 
 
-# ───────────────────────────────────────────────────────
-# Simple CNN Detector
-class SimpleDetector(nn.Module):
+# Stronger CNN architecture
+class StrongDetector(nn.Module):
     def __init__(self):
         super().__init__()
-        self.features = nn.Sequential(
-            nn.Conv2d(3, 16, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
-            nn.Conv2d(16, 32, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
-            nn.Conv2d(32, 64, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
+        self.backbone = nn.Sequential(
+            nn.Conv2d(3, 32, 3, padding=1), nn.BatchNorm2d(32), nn.ReLU(), nn.MaxPool2d(2),
+            nn.Conv2d(32, 64, 3, padding=1), nn.BatchNorm2d(64), nn.ReLU(), nn.MaxPool2d(2),
+            nn.Conv2d(64, 128, 3, padding=1), nn.BatchNorm2d(128), nn.ReLU(), nn.MaxPool2d(2),
+            nn.Conv2d(128, 256, 3, padding=1), nn.BatchNorm2d(256), nn.ReLU(), nn.MaxPool2d(2),
+            nn.Conv2d(256, 256, 3, padding=1), nn.BatchNorm2d(256), nn.ReLU(), nn.MaxPool2d(2),
         )
         self.regressor = nn.Sequential(
             nn.Flatten(),
-            nn.Linear((IMG_WIDTH // 8) * (IMG_HEIGHT // 8) * 64, 256),
+            nn.Linear((IMG_WIDTH // 32) * (IMG_HEIGHT // 32) * 256, 512),
             nn.ReLU(),
-            nn.Linear(256, 4)  # x1, y1, x2, y2
+            nn.Dropout(0.3),
+            nn.Linear(512, 256),
+            nn.ReLU(),
+            nn.Linear(256, 4)
         )
 
     def forward(self, x):
-        x = self.features(x)
-        x = self.regressor(x)
-        return x
+        x = self.backbone(x)
+        return self.regressor(x)
 
 
-# ───────────────────────────────────────────────────────
-# Train and Evaluate
+# Metrics calculation
+def box_iou(box1, box2):
+    xA = max(box1[0], box2[0])
+    yA = max(box1[1], box2[1])
+    xB = min(box1[2], box2[2])
+    yB = min(box1[3], box2[3])
+    inter = max(0, xB - xA) * max(0, yB - yA)
+    area1 = (box1[2] - box1[0]) * (box1[3] - box1[1])
+    area2 = (box2[2] - box2[0]) * (box2[3] - box2[1])
+    union = area1 + area2 - inter
+    return inter / union if union > 0 else 0.0
+
+def evaluate_metrics(model, loader, device, iou_threshold=0.5):
+    model.eval()
+    TP, FP, FN = 0, 0, 0
+    with torch.no_grad():
+        for imgs, boxes in loader:
+            imgs = imgs.to(device).float() / 255.0
+            preds = model(imgs).cpu().numpy()
+            gts = boxes.numpy()
+            for pred_box, gt_box in zip(preds, gts):
+                iou = box_iou(pred_box, gt_box)
+                if iou >= iou_threshold:
+                    TP += 1
+                else:
+                    FP += 1
+                    FN += 1
+    precision = TP / (TP + FP + 1e-6)
+    recall = TP / (TP + FN + 1e-6)
+    f1 = 2 * precision * recall / (precision + recall + 1e-6)
+    print(f"📊 Precision: {precision:.3f}, Recall: {recall:.3f}, F1: {f1:.3f}")
+
+
+# Training loop
 def train(model, loader, device, optimizer, criterion):
     model.train()
     total_loss = 0
@@ -98,32 +116,19 @@ def train(model, loader, device, optimizer, criterion):
     print(f"📉 Avg Loss: {total_loss / len(loader):.4f}")
 
 
-def evaluate(model, loader, device):
-    model.eval()
-    print("🔍 Sample Predictions:")
-    with torch.no_grad():
-        for imgs, boxes in loader:
-            imgs = imgs.to(device).float() / 255.0
-            preds = model(imgs).cpu().numpy()
-            print("Pred box:", preds[0])
-            print("True box:", boxes[0].numpy())
-            break
-
-
-# ───────────────────────────────────────────────────────
-# Main CLI
+# CLI Entry
 def main():
-    parser = argparse.ArgumentParser(description="Train a CNN detector on polygon labels")
-    parser.add_argument('--root', '-r', required=True, help='Dataset root directory')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--root', '-r', required=True)
     parser.add_argument('--epochs', '-e', type=int, default=30)
     parser.add_argument('--batch', '-b', type=int, default=4)
     parser.add_argument('--lr', type=float, default=1e-4)
-    parser.add_argument('--device', '-d', type=str, default='0')
-    parser.add_argument('--exp', '-n', default='custom_cnn', help='Experiment name')
+    parser.add_argument('--device', '-d', default='0')
+    parser.add_argument('--exp', '-n', default='custom_cnn')
     args = parser.parse_args()
 
     device = torch.device(f'cuda:{args.device}' if torch.cuda.is_available() and args.device != 'cpu' else 'cpu')
-    model = SimpleDetector().to(device)
+    model = StrongDetector().to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     criterion = nn.SmoothL1Loss()
 
@@ -145,7 +150,7 @@ def main():
     for epoch in range(args.epochs):
         print(f"\nEpoch {epoch+1}/{args.epochs}")
         train(model, train_loader, device, optimizer, criterion)
-        evaluate(model, test_loader, device)
+        evaluate_metrics(model, test_loader, device)
 
     os.makedirs(f"runs/train/{args.exp}", exist_ok=True)
     torch.save(model.state_dict(), f"runs/train/{args.exp}/best.pt")
