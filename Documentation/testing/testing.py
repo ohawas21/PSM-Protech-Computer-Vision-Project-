@@ -82,8 +82,9 @@ def extract_regions(image_path: str, ann_path: str, output_dir: str) -> int:
 
 
 if __name__ == '__main__':
-    IMAGE_PATH = r"PSM-Protech-Feasibility-Study\Src\Model\falcon_r1\dataset\test\images\230520_pdf_page_1_png.rf.e1e2bec49dc2a4800914d454dda9f896.jpg"
-    ANN_PATH   = r"PSM-Protech-Feasibility-Study\Src\Model\falcon_r1\dataset\test\labels\230520_pdf_page_1_png.rf.e1e2bec49dc2a4800914d454dda9f896.txt"
-    OUTPUT_DIR = r"PSM-Protech-Feasibility-Study\Documentation\testing"
+    IMAGE_PATH = r"C:/Users/alyan/PSE/PSM-Protech-Feasibility-Study/Src/Model/falcon_r1/dataset/test/images/230520_pdf_page_1_png.rf.e1e2bec49dc2a4800914d454dda9f896.jpg"
+    ANN_PATH   = r"C:/Users/alyan/PSE/PSM-Protech-Feasibility-Study/Src/Model/falcon_r1/dataset/test/labels/230520_pdf_page_1_png.rf.e1e2bec49dc2a4800914d454dda9f896.txt"
+    OUTPUT_DIR = r"C:/Users/alyan/PSE/PSM-Protech-Feasibility-Study/Documentation/testing"
+
 
     extract_regions(IMAGE_PATH, ANN_PATH, OUTPUT_DIR)
