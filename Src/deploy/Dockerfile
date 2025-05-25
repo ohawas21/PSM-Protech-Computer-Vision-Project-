@@ -1,7 +1,7 @@
-# Stage 1: Build dependencies and Python packages
+# Stage 1: Build with Python and required system libraries
 FROM python:3.10-slim AS builder
 
-# Install system dependencies needed to build and run the app
+# Install required system packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr \
     libmagic1 \
@@ -10,16 +10,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-0 \
  && rm -rf /var/lib/apt/lists/*
 
+# Set work directory
 WORKDIR /app
 
-# Install Python dependencies
+# Copy and install Python requirements
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Stage 2: Final runtime image
+# Stage 2: Minimal runtime container
 FROM python:3.10-slim
 
-# Install only runtime dependencies
+# Reinstall runtime libraries (needed for OpenCV, Tesseract, etc.)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr \
     libmagic1 \
@@ -28,20 +29,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-0 \
  && rm -rf /var/lib/apt/lists/*
 
+# Set work directory
 WORKDIR /app
 
-# Copy installed Python packages from builder
+# Copy Python dependencies from builder
 COPY --from=builder /usr/local/lib/python3.10/site-packages/ /usr/local/lib/python3.10/site-packages/
 
-# Copy app source code
+# Copy application code
 COPY . .
 
-# Create necessary folders and set permissions
+# Create necessary working directories
 RUN mkdir -p Falcon_r1_preprocess Falcon_r2_preprocess Falcon_r3_input models outputs results temp_processing \
  && chmod -R 755 Falcon_r1_preprocess Falcon_r2_preprocess Falcon_r3_input models outputs results temp_processing
 
-# Expose application port
+# Expose port for Flask
 EXPOSE 5001
 
-# Start the Flask app (use Gunicorn in production if needed)
+# Start Flask app (or Gunicorn in production)
 CMD ["python", "app.py"]
