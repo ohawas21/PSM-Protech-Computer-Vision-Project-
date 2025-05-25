@@ -5,7 +5,7 @@ import subprocess
 from falcon_r2 import check_all_models  # Import the model check function
 
 app = Flask(__name__)
-app.secret_key = 'your_secret_key'  # Required for flashing messages
+app.secret_key = 'your_secret_key'
 UPLOAD_FOLDER = 'falcon_r1_preprocess'
 OUTPUT_FOLDER = 'output'
 
@@ -23,9 +23,9 @@ def cleanup_folders():
             file_path = os.path.join(folder, file_name)
             try:
                 if os.path.isfile(file_path):
-                    os.unlink(file_path)  # Remove file
+                    os.unlink(file_path)
                 elif os.path.isdir(file_path):
-                    os.rmdir(file_path)  # Remove empty folder
+                    os.rmdir(file_path)
             except Exception as e:
                 logging.error(f'Error cleaning up {file_path}: {e}')
     logging.info('Cleanup completed.')
@@ -48,28 +48,22 @@ def upload_file():
     logging.info(f'File uploaded successfully: {file_path}')
 
     try:
-        # Check if all required models are available
         if not check_all_models():
             flash('Some models are missing. Please check the logs for details.', 'error')
             return redirect(url_for('index'))
 
-        # Call falcon_r1.py
         logging.info('Starting falcon_r1 preprocessing...')
-        subprocess.run(['python', 'falcon_r1.py'], check=True)
+        subprocess.run(['python3', 'falcon_r1.py'], check=True)
 
-        # Call falcon_r2.py
         logging.info('Starting falcon_r2 processing...')
-        subprocess.run(['python', 'falcon_r2.py'], check=True)
+        subprocess.run(['python3', 'falcon_r2.py'], check=True)
 
-        # Call falcon_r3.py
         logging.info('Starting falcon_r3 classification...')
-        subprocess.run(['python', 'falcon_r3.py'], check=True)
+        subprocess.run(['python3', 'falcon_r3.py'], check=True)
 
-        # Call falcon_r4.py
         logging.info('Starting falcon_r4 data extraction...')
-        subprocess.run(['python', 'falcon_r4.py'], check=True)
+        subprocess.run(['python3', 'falcon_r4.py'], check=True)
 
-        # Cleanup intermediate folders
         logging.info('Starting cleanup of intermediate folders...')
         cleanup_folders()
 
@@ -95,16 +89,15 @@ def get_progress():
         return jsonify({'progress': 'No progress log found.'})
     with open('progress.log', 'r') as log_file:
         logs = log_file.readlines()
-    return jsonify({'progress': logs[-10:]})  # Return the last 10 log entries
+    return jsonify({'progress': logs[-10:]})
 
 @app.route('/check_models', methods=['GET'])
 def check_models():
     required_models = [
         'models/falcon_r1.pt',
         'models/falcon_r2.pt',
-        'models/falcon_r3.pt'  # Exclude falcon_r4.pt as it is not a model
+        'models/falcon_r3.pt'
     ]
-
     missing_models = [model for model in required_models if not os.path.exists(model)]
 
     if missing_models:
@@ -116,4 +109,4 @@ def check_models():
     return jsonify({'status': 'success'})
 
 if __name__ == '__main__':
-    app.run(host= "0.0.0.0" , port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)
