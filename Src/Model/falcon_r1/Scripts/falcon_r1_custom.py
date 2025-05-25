@@ -40,13 +40,17 @@ class PolygonToBoxDataset(Dataset):
 
         boxes = []
         if lbl_path:
-            with open(lbl_path, 'r') as f:
-                data = json.load(f)
-            for shape in data['shapes']:
-                pts = np.array(shape['points'])
-                x_min, y_min = np.min(pts, axis=0)
-                x_max, y_max = np.max(pts, axis=0)
-                boxes.append([x_min, y_min, x_max, y_max])
+            try:
+                with open(lbl_path, 'r') as f:
+                    data = json.load(f)
+                for shape in data['shapes']:
+                    pts = np.array(shape['points'])
+                    x_min, y_min = np.min(pts, axis=0)
+                    x_max, y_max = np.max(pts, axis=0)
+                    boxes.append([x_min, y_min, x_max, y_max])
+            except Exception as e:
+                print(f"⚠️ Warning: Failed to load or parse JSON {lbl_path}: {e}")
+                boxes = []
 
         box = torch.tensor([0, 0, 1, 1], dtype=torch.float32) if not boxes else \
               torch.tensor(max(boxes, key=lambda b: (b[2]-b[0])*(b[3]-b[1])), dtype=torch.float32)
@@ -82,6 +86,42 @@ def box_iou(box1, box2):
     union = area1 + area2 - inter
     return inter / union if union > 0 else 0.0
 
+def giou_loss(preds, targets):
+    # preds and targets: [batch_size, 4] (x_min, y_min, x_max, y_max)
+    x_min_pred, y_min_pred, x_max_pred, y_max_pred = preds[:,0], preds[:,1], preds[:,2], preds[:,3]
+    x_min_tgt, y_min_tgt, x_max_tgt, y_max_tgt = targets[:,0], targets[:,1], targets[:,2], targets[:,3]
+
+    # Intersection
+    x_min_inter = torch.max(x_min_pred, x_min_tgt)
+    y_min_inter = torch.max(y_min_pred, y_min_tgt)
+    x_max_inter = torch.min(x_max_pred, x_max_tgt)
+    y_max_inter = torch.min(y_max_pred, y_max_tgt)
+
+    inter_w = (x_max_inter - x_min_inter).clamp(min=0)
+    inter_h = (y_max_inter - y_min_inter).clamp(min=0)
+    inter_area = inter_w * inter_h
+
+    # Union
+    area_pred = (x_max_pred - x_min_pred) * (y_max_pred - y_min_pred)
+    area_tgt = (x_max_tgt - x_min_tgt) * (y_max_tgt - y_min_tgt)
+    union_area = area_pred + area_tgt - inter_area
+
+    iou = inter_area / (union_area + 1e-7)
+
+    # Enclosing box
+    x_min_enc = torch.min(x_min_pred, x_min_tgt)
+    y_min_enc = torch.min(y_min_pred, y_min_tgt)
+    x_max_enc = torch.max(x_max_pred, x_max_tgt)
+    y_max_enc = torch.max(y_max_pred, y_max_tgt)
+
+    enc_w = (x_max_enc - x_min_enc).clamp(min=0)
+    enc_h = (y_max_enc - y_min_enc).clamp(min=0)
+    enc_area = enc_w * enc_h + 1e-7
+
+    giou = iou - (enc_area - union_area) / enc_area
+    loss = 1 - giou
+    return loss.mean()
+
 def evaluate_metrics(model, loader, device, iou_threshold=0.5):
     model.eval()
     TP = FP = FN = 0
@@ -112,25 +152,26 @@ def train(model, loader, device, optimizer, criterion, scaler):
         total_loss += loss.item()
     print(f"📉 Avg Loss: {total_loss / len(loader):.4f}")
 
-def save_predictions(model, loader, device, save_dir="runs/test_images", max_samples=10):
+def save_predictions(model, loader, device, save_dir="runs/test_images"):
     os.makedirs(save_dir, exist_ok=True)
-    model.eval(); count = 0
+    model.eval()
     with torch.no_grad():
-        for imgs, boxes in loader:
+        for idx, (imgs, boxes) in enumerate(loader):
             imgs = imgs.to(device).float() / 255.0
-            with autocast(): preds = model(imgs).cpu().numpy()
-            imgs_np = imgs.cpu().numpy().transpose(0, 2, 3, 1) * 255.0
+            with autocast():
+                preds = model(imgs).cpu().numpy()
             boxes = boxes.cpu().numpy()
-            for i in range(len(preds)):
-                img_path = loader.dataset.img_paths[count]
+            batch_size = imgs.shape[0]
+            for i in range(batch_size):
+                img_path = loader.dataset.img_paths[idx * loader.batch_size + i]
                 orig_img = Image.open(img_path).convert("RGB")
                 dpi = orig_img.info.get('dpi', (72, 72))
                 draw = ImageDraw.Draw(orig_img)
                 draw.rectangle(preds[i].tolist(), outline="green", width=4)
                 draw.rectangle(boxes[i].tolist(), outline="red", width=3)
-                orig_img.save(os.path.join(save_dir, f"pred_{count}.png"), dpi=dpi)
-                count += 1
-                if count >= max_samples: return
+                base_name = os.path.basename(img_path)
+                save_path = os.path.join(save_dir, base_name)
+                orig_img.save(save_path, dpi=dpi)
 
 def main():
     parser = argparse.ArgumentParser()
@@ -146,8 +187,16 @@ def main():
     device = torch.device(f"cuda:{args.device}" if torch.cuda.is_available() and args.device != 'cpu' else 'cpu')
     model = StrongDetector().to(device); count_parameters(model)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-    criterion = nn.SmoothL1Loss()
+    criterion = giou_loss
     scaler = GradScaler()
+
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
+
+    def unfreeze_last_resnet_block(model):
+        # Unfreeze layer4 of resnet50 backbone
+        for name, param in model.feature_extractor.named_parameters():
+            if name.startswith('6.'):  # layer4 is the 7th child (index 6)
+                param.requires_grad = True
 
     def get_loader(split):
         if args.doot:
@@ -170,14 +219,47 @@ def main():
     train_loader = get_loader('train')
     val_loader = get_loader('val') if args.doot else get_loader('test')
 
+    best_loss = float('inf')
+    patience = 10
+    trigger_times = 0
+
     for epoch in range(args.epochs):
         print(f"\n📅 Epoch {epoch + 1}/{args.epochs}")
+
+        # Unfreeze last ResNet block after 10 epochs
+        if epoch == 10:
+            unfreeze_last_resnet_block(model)
+            optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr)
+            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs - epoch)
+
         train(model, train_loader, device, optimizer, criterion, scaler)
+        model.eval()
+        val_loss = 0.0
+        with torch.no_grad():
+            for imgs, boxes in val_loader:
+                imgs, boxes = imgs.to(device).float() / 255.0, boxes.to(device)
+                preds = model(imgs)
+                loss = criterion(preds, boxes)
+                val_loss += loss.item()
+        val_loss /= len(val_loader)
+        print(f"🔍 Validation Loss: {val_loss:.4f}")
+
         evaluate_metrics(model, val_loader, device)
 
-    os.makedirs(f"runs/train/{args.exp}", exist_ok=True)
-    torch.save(model.state_dict(), f"runs/train/{args.exp}/best.pt")
-    print(f"✅ Saved to runs/train/{args.exp}/best.pt")
+        scheduler.step()
+
+        if val_loss < best_loss:
+            best_loss = val_loss
+            trigger_times = 0
+            os.makedirs(f"runs/train/{args.exp}", exist_ok=True)
+            torch.save(model.state_dict(), f"runs/train/{args.exp}/best.pt")
+            print(f"✅ Saved to runs/train/{args.exp}/best.pt")
+        else:
+            trigger_times += 1
+            if trigger_times >= patience:
+                print(f"⏹ Early stopping triggered after {patience} epochs with no improvement.")
+                break
+
     save_predictions(model, val_loader, device)
 
 if __name__ == "__main__":
