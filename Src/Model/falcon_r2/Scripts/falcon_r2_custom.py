@@ -1,193 +1,128 @@
 import os
 import json
-import argparse
-import shutil
-import subprocess
-import random
-import sys
-from glob import glob
+from pathlib import Path
 from PIL import Image
+from ultralytics import YOLO
+import argparse
+import random
+import shutil
 
-def polygon_to_bbox(points):
-    xs = [p[0] for p in points]
-    ys = [p[1] for p in points]
-    x_min, x_max = min(xs), max(xs)
-    y_min, y_max = min(ys), max(ys)
-    return x_min, y_min, x_max, y_max
+# 1. Convert LabelMe JSON to YOLO Segmentation Format
+def convert_polygon_to_yolo(points, img_w, img_h):
+    return [coord / img_w if i % 2 == 0 else coord / img_h for i, coord in enumerate(sum(points, []))]
 
-def convert_labelme_to_yolo(json_path, img_size):
-    with open(json_path, 'r') as f:
-        data = json.load(f)
+def convert_labelme_dataset(labelme_dir, yolo_label_dir, class_map):
+    os.makedirs(yolo_label_dir, exist_ok=True)
 
-    width, height = img_size
-    yolo_lines = []
+    for json_file in Path(labelme_dir).rglob("*.json"):
+        with open(json_file, "r") as f:
+            data = json.load(f)
 
-    for shape in data.get('shapes', []):
-        points = shape.get('points', [])
-        if not points:
+        image_path = Path(labelme_dir, data["imagePath"])
+        if not image_path.exists():
+            print(f"[WARN] Image not found for {json_file.name}, skipping.")
             continue
-        x_min, y_min, x_max, y_max = polygon_to_bbox(points)
 
-        x_center = ((x_min + x_max) / 2) / width
-        y_center = ((y_min + y_max) / 2) / height
-        w = (x_max - x_min) / width
-        h = (y_max - y_min) / height
+        with Image.open(image_path) as img:
+            img_w, img_h = img.size
 
-        yolo_lines.append(f"0 {x_center:.6f} {y_center:.6f} {w:.6f} {h:.6f}")
-
-    return yolo_lines
-
-def main():
-    parser = argparse.ArgumentParser(description='Convert LabelMe annotations and train YOLOv8.')
-    parser.add_argument('--root', type=str, default=os.getcwd(), help='Root directory with images and annotations')
-    args = parser.parse_args(sys.argv[1:])
-
-    root_dir = args.root
-    img_exts = ['.jpg', '.png', '.jpeg']
-    image_files = []
-    for ext in img_exts:
-        image_files.extend(glob(os.path.join(root_dir, f'*{ext}')))
-    image_files = sorted(image_files)
-
-    random.seed(42)
-    random.shuffle(image_files)
-    n_total = len(image_files)
-    n_train = int(0.8 * n_total)
-    train_imgs = image_files[:n_train]
-    val_imgs = image_files[n_train:]
-
-    images_train_dir = os.path.join(root_dir, 'images', 'train')
-    images_val_dir = os.path.join(root_dir, 'images', 'val')
-    labels_train_dir = os.path.join(root_dir, 'labels', 'train')
-    labels_val_dir = os.path.join(root_dir, 'labels', 'val')
-    for d in [images_train_dir, images_val_dir, labels_train_dir, labels_val_dir]:
-        os.makedirs(d, exist_ok=True)
-
-    def process_and_save(img_paths, images_dir, labels_dir):
-        for img_path in img_paths:
-            base_name = os.path.splitext(os.path.basename(img_path))[0]
-            json_path = os.path.join(root_dir, base_name + '.json')
-            if not os.path.exists(json_path):
-                continue
-            try:
-                with Image.open(img_path) as img:
-                    width, height = img.size
-                yolo_lines = convert_labelme_to_yolo(json_path, (width, height))
-            except Exception as e:
-                print(f"❌ Failed to process {img_path}: {e}")
+        output_lines = []
+        for shape in data["shapes"]:
+            if shape["shape_type"] != "polygon":
                 continue
 
-            shutil.copy2(img_path, os.path.join(images_dir, os.path.basename(img_path)))
-
-            label_path = os.path.join(labels_dir, base_name + '.txt')
-            if yolo_lines:
-                with open(label_path, 'w') as f:
-                    f.write('\n'.join(yolo_lines))
-            else:
-                open(label_path, 'w').close()
-
-    process_and_save(train_imgs, images_train_dir, labels_train_dir)
-    process_and_save(val_imgs, images_val_dir, labels_val_dir)
-
-    data_yaml = f"""\
-path: {root_dir}
-train: images/train
-val: images/val
-
-nc: 1
-names: ['object']
-"""
-    with open(os.path.join(root_dir, 'data.yaml'), 'w') as f:
-        f.write(data_yaml)
-
-    train_cmd = [
-        'yolo', 'task=detect', 'mode=train',
-        'model=yolov8m.pt',
-        f'data={os.path.join(root_dir, "data.yaml")}',
-        'epochs=3000'
-    ]
-    print("🚀 Starting YOLOv8 training...")
-    try:
-        subprocess.run(train_cmd, check=True)
-    except Exception as e:
-        print("❌ Failed to launch YOLOv8 training:", e)
-        return
-
-    # Find the latest training directory and best.pt path
-    train_runs = glob('runs/detect/train*')
-    if train_runs:
-        latest_run = max(train_runs, key=os.path.getmtime)
-        best_model_src = os.path.join(latest_run, 'weights', 'best.pt')
-    else:
-        best_model_src = None
-
-    # Copy best model to root directory and backup in models directory
-    if best_model_src and os.path.exists(best_model_src):
-        best_model_dst = os.path.join(root_dir, 'best.pt')
-        shutil.copy2(best_model_src, best_model_dst)
-        models_dir = os.path.join(root_dir, 'models')
-        os.makedirs(models_dir, exist_ok=True)
-        backup_model_dst = os.path.join(models_dir, 'best.pt')
-        shutil.copy2(best_model_src, backup_model_dst)
-    else:
-        print("❌ Best model not found after training.")
-
-    # After training, run prediction on validation images and save results
-    try:
-        from ultralytics import YOLO
-        import cv2
-        import numpy as np
-
-        if not best_model_src or not os.path.exists(best_model_src):
-            print(f"❌ Best model not found at {best_model_src}")
-            return
-        model = YOLO(best_model_src)
-        save_dir = 'runs/test_images'
-        os.makedirs(save_dir, exist_ok=True)
-        print("🚀 Running prediction on validation images...")
-        # Run prediction with specified options
-        results = model.predict(source=images_val_dir, save=True, save_dir=save_dir,
-                                save_txt=True, save_conf=True,
-                                vid_stride=1, visualize=False)
-
-        # Replace resized saved images with copies of original quality validation images
-        # and overlay predictions manually if necessary
-        for result in results:
-            # result.orig_img is the original image in numpy array
-            # result.path is the path to the input image
-            orig_img_path = result.path
-            base_name = os.path.basename(orig_img_path)
-            saved_img_path = os.path.join(save_dir, base_name)
-
-            # Copy original quality image to replace saved resized image
-            shutil.copy2(orig_img_path, saved_img_path)
-
-            # Load original image to overlay predictions
-            img = cv2.imread(saved_img_path)
-            if img is None:
+            class_id = class_map.get(shape["label"])
+            if class_id is None:
+                print(f"[WARN] Unknown label: {shape['label']}")
                 continue
 
-            # Overlay boxes and labels from prediction
-            boxes = result.boxes
-            for box in boxes:
-                xyxy = box.xyxy[0].cpu().numpy().astype(int)
-                conf = box.conf[0].item()
-                cls = int(box.cls[0].item())
-                label = f"{cls} {conf:.2f}"
-                # Draw rectangle
-                cv2.rectangle(img, (xyxy[0], xyxy[1]), (xyxy[2], xyxy[3]), (0, 255, 0), 2)
-                # Put label
-                cv2.putText(img, label, (xyxy[0], xyxy[1] - 10), cv2.FONT_HERSHEY_SIMPLEX,
-                            0.5, (0, 255, 0), 2)
+            norm_coords = convert_polygon_to_yolo(shape["points"], img_w, img_h)
+            output_lines.append(f"{class_id} " + " ".join(f"{v:.6f}" for v in norm_coords))
 
-            # Save the overlaid image
-            cv2.imwrite(saved_img_path, img)
+        with open(Path(yolo_label_dir, json_file.stem + ".txt"), "w") as f:
+            f.write("\n".join(output_lines))
 
-        print("✅ Prediction images saved to runs/test_images/")
-    except ImportError:
-        print("❌ ultralytics package not found. Please install it to run predictions.")
-    except Exception as e:
-        print(f"❌ Failed to run prediction: {e}")
+# 2. Generate data.yaml
+def generate_data_yaml(save_path, class_map, train_img, val_img):
+    with open(save_path, "w") as f:
+        f.write(f"path: {Path(train_img).parent.parent.resolve()}\n")
+        f.write(f"train: {Path(train_img).parent.name}/images\n")
+        f.write(f"val: {Path(val_img).parent.name}/images\n")
+        f.write("names:\n")
+        for i, name in class_map.items():
+            f.write(f"  {name}: '{i}'\n")
+
+# 3. Auto pipeline
+def auto_train_pipeline(labelme_train, labelme_val, dataset_root, class_list, model_path='yolov8l-seg.pt'):
+    class_map = {label: idx for idx, label in enumerate(class_list)}
+    structure = ['train', 'val']
+
+    for split in structure:
+        img_dir = Path(dataset_root, split, "images")
+        lbl_dir = Path(dataset_root, split, "labels")
+        os.makedirs(img_dir, exist_ok=True)
+        os.makedirs(lbl_dir, exist_ok=True)
+
+        src_json_dir = Path(labelme_train if split == "train" else labelme_val)
+        for json_file in Path(src_json_dir).rglob("*.json"):
+            data = json.load(open(json_file))
+            image_file = Path(src_json_dir, data["imagePath"])
+            if image_file.exists():
+                os.system(f'cp "{image_file}" "{img_dir}/{image_file.name}"')  # copy images
+
+        convert_labelme_dataset(src_json_dir, lbl_dir, class_map)
+
+    yaml_path = Path(dataset_root, "data.yaml")
+    sample_train_img = next(Path(dataset_root, "train", "images").glob("*.png"))
+    sample_val_img = next(Path(dataset_root, "val", "images").glob("*.png"))
+    generate_data_yaml(yaml_path, {v: k for k, v in class_map.items()}, sample_train_img, sample_val_img)
+
+    # 4. Train YOLOv8
+    model = YOLO(model_path)
+    model.train(
+        data=str(yaml_path),
+        epochs=300,
+        imgsz=640,
+        task="segment",
+        name="auto_seg_train"
+    )
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Train YOLOv8 segmentation model from LabelMe data")
+    parser.add_argument("--root", type=str, required=True, help="Root directory containing LabelMe JSON and images")
+    args = parser.parse_args()
+
+    root_path = Path(args.root)
+    all_jsons = list(root_path.rglob("*.json"))
+    random.seed(42)
+    random.shuffle(all_jsons)
+
+    split_idx = int(0.8 * len(all_jsons))
+    train_jsons = all_jsons[:split_idx]
+    val_jsons = all_jsons[split_idx:]
+
+    tmp_root = Path("Dataset_split")
+    labelme_train = tmp_root / "labelme_train"
+    labelme_val = tmp_root / "labelme_val"
+    os.makedirs(labelme_train, exist_ok=True)
+    os.makedirs(labelme_val, exist_ok=True)
+
+    for f in train_jsons:
+        shutil.copy(f, labelme_train / f.name)
+        img_file = f.parent / json.load(open(f))["imagePath"]
+        if img_file.exists():
+            shutil.copy(img_file, labelme_train / img_file.name)
+
+    for f in val_jsons:
+        shutil.copy(f, labelme_val / f.name)
+        img_file = f.parent / json.load(open(f))["imagePath"]
+        if img_file.exists():
+            shutil.copy(img_file, labelme_val / img_file.name)
+
+    auto_train_pipeline(
+        labelme_train=labelme_train,
+        labelme_val=labelme_val,
+        dataset_root="Dataset",  # will structure Dataset/train/images etc.
+        class_list=["falcon_r2"],  # can be extended
+        model_path="yolov8l-seg.pt"
+    )
