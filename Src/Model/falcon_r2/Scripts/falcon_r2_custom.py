@@ -45,23 +45,60 @@ log = logging.getLogger("falcon_r2")
 
 def _extract_boxes(img_path: Path) -> Tuple[List[List[float]], List[str]]:
     """Return axis-aligned boxes & labels for *one* image.
-    Looks for `img.stem + .json` first, then `img.name + .json`.
-    Raises FileNotFoundError if neither exists.
+    Looks for multiple JSON naming patterns:
+    1. img.stem + .json (e.g., 80.png -> 80.json)
+    2. img.name + .json (e.g., 80.png -> 80.png.json)
+    3. Same directory structure but in different folders
+    
+    Raises FileNotFoundError if no JSON is found.
     """
+    # Pattern 1: Replace extension with .json (most common)
     cand1 = img_path.with_suffix(".json")
+    
+    # Pattern 2: Add .json to full filename
     cand2 = img_path.with_suffix(img_path.suffix + ".json")
-    json_path = cand1 if cand1.exists() else cand2
-    if not json_path.exists():
-        raise FileNotFoundError
+    
+    # Check if either exists
+    json_path = None
+    if cand1.exists():
+        json_path = cand1
+    elif cand2.exists():
+        json_path = cand2
+    else:
+        # Log the specific files we looked for
+        log.debug(f"Checked for annotations: {cand1}, {cand2}")
+        raise FileNotFoundError(f"No JSON annotation found for {img_path.name}")
 
-    with open(json_path, encoding="utf-8") as f:
-        data = json.load(f)
+    try:
+        with open(json_path, encoding="utf-8") as f:
+            data = json.load(f)
+    except json.JSONDecodeError as e:
+        log.warning(f"Invalid JSON in {json_path}: {e}")
+        raise FileNotFoundError(f"Invalid JSON format in {json_path}")
 
     boxes, labels = [], []
-    for shp in data.get("shapes", []):
-        xs, ys = zip(*shp["points"])
-        boxes.append([min(xs), min(ys), max(xs), max(ys)])
-        labels.append(shp["label"])
+    shapes = data.get("shapes", [])
+    
+    if not shapes:
+        log.warning(f"No shapes found in {json_path}")
+        return boxes, labels
+    
+    for shp in shapes:
+        points = shp.get("points", [])
+        label = shp.get("label", "unknown")
+        
+        if len(points) < 2:
+            log.warning(f"Skipping shape with insufficient points in {json_path}")
+            continue
+            
+        try:
+            xs, ys = zip(*points)
+            boxes.append([min(xs), min(ys), max(xs), max(ys)])
+            labels.append(label)
+        except (ValueError, TypeError) as e:
+            log.warning(f"Skipping malformed shape in {json_path}: {e}")
+            continue
+    
     return boxes, labels
 
 # ─────────────────────────────────── Dataset ───────────────────────────────────
@@ -148,76 +185,3 @@ class Detector(pl.LightningModule):
         return [opt], [sch]
 
 # ───────────────────────────── dataset helpers ─────────────────────────────────
-
-def build_filelists(data_dir: Path, exts: Tuple[str, ...]):
-    imgs = [p for e in exts for p in data_dir.glob(f"*.{e.lstrip('.')}")]
-    if not imgs:
-        raise FileNotFoundError(f"No images with extensions {exts} in {data_dir}")
-
-    valid, first_labels = [], []
-    for p in imgs:
-        try:
-            boxes, labels = _extract_boxes(p)
-        except FileNotFoundError:
-            log.warning("skip %s : no JSON", p.name)
-            continue
-        valid.append(p)
-        first_labels.append(labels[0] if labels else "_background_")
-
-    if not valid:
-        raise RuntimeError("After skipping missing annotations, dataset is empty")
-    return valid, first_labels
-
-
-def stratified(ids: List[int], labels: List[str], ratio=0.2):
-    if len(set(labels)) < 2:
-        return train_test_split(ids, test_size=ratio, random_state=42)
-    sss = StratifiedShuffleSplit(1, test_size=ratio, random_state=42)
-    return next(sss.split(ids, labels))
-
-
-def build_datasets(root: Path, img_size: int, exts: Tuple[str, ...]):
-    files, lbls = build_filelists(root, exts)
-    classes = sorted({l for l in lbls if l != "_background_"})
-    label2idx = {c: i + 1 for i, c in enumerate(classes)}  # 0 = background
-
-    ids = list(range(len(files)))
-    tr_ids, va_ids = stratified(ids, lbls)
-    tfm = T.Compose([T.Resize((img_size, img_size)), T.ToTensor()])
-    tr_ds = LabelMeDetDataset([files[i] for i in tr_ids], label2idx, tfm)
-    va_ds = LabelMeDetDataset([files[i] for i in va_ids], label2idx, tfm)
-    return tr_ds, va_ds, label2idx
-
-# ─────────────────────────────────── main ──────────────────────────────────────
-
-def main(cfg):
-    data_dir = Path(cfg.data_dir)
-    exts = tuple(e.strip().lstrip(".") for e in cfg.img_exts.split(","))
-
-    tr_ds, va_ds, l2i = build_datasets(data_dir, cfg.image_size, exts)
-    num_classes = len(l2i) + 1
-
-    tr_loader = DataLoader(tr_ds, batch_size=cfg.batch_size, shuffle=True, num_workers=4, collate_fn=collate_fn)
-    va_loader = DataLoader(va_ds, batch_size=cfg.batch_size, shuffle=False, num_workers=4, collate_fn=collate_fn)
-
-    model = Detector(num_classes, lr=cfg.lr, crop_dir=Path(cfg.output_dir))
-    ckpt = pl.callbacks.ModelCheckpoint(monitor="val/mAP50", mode="max", save_top_k=1,
-                                        filename="det-{epoch:02d}-{val/mAP50:.2f}")
-    trainer = pl.Trainer(max_epochs=cfg.epochs, accelerator="auto", devices="auto",
-                         precision=16 if torch.cuda.is_available() else 32,
-                         callbacks=[ckpt], log_every_n_steps=10)
-
-    trainer.fit(model, tr_loader, va_loader)
-    trainer.test(model, va_loader, ckpt_path="best")
-
-
-if __name__ == "__main__":
-    ap = argparse.ArgumentParser(description="Faster-R-CNN + auto-crop for LabelMe datasets")
-    ap.add_argument("--data_dir", required=True, help="Folder with images + LabelMe JSONs")
-    ap.add_argument("--output_dir", default="./crops")
-    ap.add_argument("--img_exts", default="jpg,jpeg,png", help="Comma-separated list of image extensions")
-    ap.add_argument("--epochs", type=int, default=30)
-    ap.add_argument("--batch_size", type=int, default=4)
-    ap.add_argument("--lr", type=float, default=1e-4)
-    ap.add_argument("--image_size", type=int, default=640)
-    main(ap.parse_args())
