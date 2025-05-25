@@ -1,45 +1,32 @@
-import os
-import glob
 import json
 import cv2
 import numpy as np
+from pathlib import Path
 
-# === 1) EXPLICIT PATHS ===
-# Make sure you run this script from the project root:
-# C:\Users\alyan\PSE\PSM-Protech-Feasibility-Study
-
-# Path to your images + JSONs:
-INPUT_DIR = os.path.abspath(
-    r"PSM-Protech-Feasibility-Study\Src\Model\falcon_r1\Dataset\prean"
-)
-
-# Where you want your per-polygon crops saved:
-OUTPUT_DIR = os.path.abspath(
-    r"PSM-Protech-Feasibility-Study\Src\Model\falcon_r1\bigcrop_output"
-)
-
-print(f"[INFO] INPUT_DIR:  {INPUT_DIR}")
-print(f"[INFO] OUTPUT_DIR: {OUTPUT_DIR}")
-os.makedirs(OUTPUT_DIR, exist_ok=True)
-
-
-# === 2) Find all images recursively ===
-IMG_EXTS = ("*.png", "*.jpg", "*.jpeg", "*.bmp", "*.tif", "*.tiff")
-def find_images(root):
+def find_images(root: Path, exts=("*.png", "*.jpg", "*.jpeg", "*.bmp", "*.tif", "*.tiff")):
+    """
+    Recursively find all images under `root` matching the given extensions.
+    Returns a list of Path objects.
+    """
     imgs = []
-    for ext in IMG_EXTS:
-        imgs.extend(glob.glob(os.path.join(root, "**", ext), recursive=True))
+    for ext in exts:
+        imgs.extend(root.rglob(ext))
     return imgs
 
 
-# === 3) JSON loader ===
-def load_json(path):
-    with open(path, "r") as f:
+def load_json(path: Path):
+    """
+    Load JSON data from a file path and return the parsed object.
+    """
+    with path.open("r", encoding="utf-8") as f:
         return json.load(f)
 
 
-# === 4) Crop one polygon ===
-def crop_polygon(img, pts, apply_mask=True):
+def crop_polygon(img: np.ndarray, pts: np.ndarray, apply_mask: bool = True) -> np.ndarray:
+    """
+    Crop a polygon defined by `pts` out of `img`.
+    If `apply_mask` is True, returns an RGBA image with the polygon masked.
+    """
     x, y, w, h = cv2.boundingRect(pts)
     crop = img[y : y + h, x : x + w].copy()
 
@@ -53,50 +40,63 @@ def crop_polygon(img, pts, apply_mask=True):
     return crop
 
 
-# === 5) Main ===
 def main():
+    # Determine script and project structure
+    SCRIPTS_DIR = Path(__file__).resolve().parent
+    ROOT_DIR    = SCRIPTS_DIR.parent  # .../falcon_r1
+
+    # Paths for input images and output crops
+    INPUT_DIR  = ROOT_DIR / "Dataset" / "prean"
+    OUTPUT_DIR = ROOT_DIR / "bigcrop_output"
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+    print(f"[INFO] INPUT_DIR:  {INPUT_DIR}")
+    print(f"[INFO] OUTPUT_DIR: {OUTPUT_DIR}")
+
+    # Find images
     images = find_images(INPUT_DIR)
     print(f"[INFO] Found {len(images)} image(s) under '{INPUT_DIR}'")
 
     for img_path in images:
-        rel = os.path.relpath(img_path, INPUT_DIR)
-        base = os.path.splitext(os.path.basename(img_path))[0]
-        json_path = os.path.join(os.path.dirname(img_path), base + ".json")
+        rel       = img_path.relative_to(INPUT_DIR)
+        base      = img_path.stem
+        json_path = img_path.with_suffix(".json")
 
-        if not os.path.exists(json_path):
+        if not json_path.exists():
             print(f"[WARN] No JSON for '{rel}', skipping.")
             continue
 
-        img = cv2.imread(img_path, cv2.IMREAD_UNCHANGED)
+        img = cv2.imread(str(img_path), cv2.IMREAD_UNCHANGED)
         if img is None:
             print(f"[ERROR] Failed to load '{rel}', skipping.")
             continue
 
-        data = load_json(json_path)
+        data   = load_json(json_path)
         shapes = data.get("shapes", [])
         if not shapes:
             print(f"[WARN] '{base}.json' has no shapes, skipping.")
             continue
 
-        # Make per-image subfolder in OUTPUT_DIR
-        sub_out = os.path.join(OUTPUT_DIR, os.path.dirname(rel))
-        os.makedirs(sub_out, exist_ok=True)
+        # Create subfolder in output matching input structure
+        sub_out = OUTPUT_DIR / rel.parent
+        sub_out.mkdir(parents=True, exist_ok=True)
 
         for i, shape in enumerate(shapes):
-            pts = np.array(shape["points"], dtype=np.int32)
+            pts = np.array(shape.get("points", []), dtype=np.int32)
             if pts.size == 0:
                 continue
 
+            # Clean up label text
             label = shape.get("label", "shape")
-            # sanitize label
             label = "".join(c for c in label if c.isalnum() or c in ("-", "_")).strip()
 
-            crop = crop_polygon(img, pts, apply_mask=True)
+            # Crop and save
+            crop     = crop_polygon(img, pts, apply_mask=True)
             out_name = f"{base}_{label}_{i:02d}.png"
-            out_path = os.path.join(sub_out, out_name)
+            out_path = sub_out / out_name
 
-            cv2.imwrite(out_path, crop)
-            print(f"[OK] {rel} → {os.path.relpath(out_path)}")
+            cv2.imwrite(str(out_path), crop)
+            print(f"[OK] {rel} → {out_path.relative_to(ROOT_DIR)}")
 
 if __name__ == "__main__":
     main()
