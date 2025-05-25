@@ -109,13 +109,25 @@ if __name__ == "__main__":
 
     for f in train_jsons:
         shutil.copy(f, labelme_train / f.name)
-        img_file = f.parent / json.load(open(f))["imagePath"]
+        try:
+            with open(f) as jf:
+                data = json.load(jf)
+            img_file = f.parent / data["imagePath"]
+        except json.JSONDecodeError:
+            print(f"[ERROR] Skipping corrupt JSON: {f.name}")
+            continue
         if img_file.exists():
             shutil.copy(img_file, labelme_train / img_file.name)
 
     for f in val_jsons:
         shutil.copy(f, labelme_val / f.name)
-        img_file = f.parent / json.load(open(f))["imagePath"]
+        try:
+            with open(f) as jf:
+                data = json.load(jf)
+            img_file = f.parent / data["imagePath"]
+        except json.JSONDecodeError:
+            print(f"[ERROR] Skipping corrupt JSON: {f.name}")
+            continue
         if img_file.exists():
             shutil.copy(img_file, labelme_val / img_file.name)
 
