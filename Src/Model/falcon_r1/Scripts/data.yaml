@@ -1,0 +1,6 @@
+path: /home/studvaikmu5453/Project_PSE/PSM-Protech-Feasibility-Study/Src/Model/falcon_r1/Scripts
+train: images/train
+val: images/val
+
+nc: 1
+names: ['object']
