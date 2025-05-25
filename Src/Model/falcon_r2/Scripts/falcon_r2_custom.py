@@ -1,20 +1,20 @@
 # train_crop_detector.py
 """
-Bounding-Box Detection & Auto-Cropping Pipeline (LabelMe-compatible)
+Bounding‑Box Detection & Auto‑Cropping Pipeline (LabelMe‑compatible)
 ===================================================================
-This Lightning script fine-tunes **Faster R-CNN ResNet-50 FPN** on *LabelMe*
-polygon annotations, surpassing ≥ 85 % mAP@0.50 and macro-precision targets on
-an 80 / 20 split. After training, it crops every prediction ≥ 0.50 confidence
+This Lightning script fine‑tunes **Faster R‑CNN ResNet‑50 FPN** on *LabelMe*
+polygon annotations, surpassing ≥ 85 % mAP@0.50 and macro‑precision targets on
+an 80 / 20 split. After training, it crops every prediction ≥ 0.50 confidence
 into `--output_dir`.
 
 Key upgrades vs. v1.0
 ---------------------
-* **Extension-agnostic ingest** – `--img_exts "jpg,png"` (default: jpg,jpeg,png).
-* **LabelMe polygon → axis-aligned bbox** conversion on-the-fly.
-* **Robust split** – falls back to non-stratified split when < 2 classes.
+* **Extension‑agnostic ingest** – `--img_exts "jpg,png"` (default: jpg,jpeg,png).
+* **LabelMe polygon → axis‑aligned bbox** conversion on‑the‑fly.
+* **Robust split** – falls back to non‑stratified split when < 2 classes.
 * Early, explicit error if zero images discovered.
 
-Quick-start
+Quick‑start
 -----------
 ```bash
 pip install torch torchvision torchmetrics pytorch-lightning==2.2.0 scikit-learn
@@ -42,7 +42,7 @@ from torchmetrics.detection.mean_ap import MeanAveragePrecision
 # ─────────────────────────────── LabelMe → BBox util ───────────────────────────
 
 def _extract_boxes_from_labelme(json_path: Path) -> Tuple[List[List[float]], List[str]]:
-    """Return axis-aligned bboxes + labels from a LabelMe JSON file."""
+    """Return axis‑aligned bboxes + labels from a LabelMe JSON file."""
     with open(json_path, "r", encoding="utf-8") as f:
         ann = json.load(f)
     boxes, labels = [], []
@@ -94,7 +94,7 @@ class DetectorModule(pl.LightningModule):
         self.metric_map = MeanAveragePrecision(iou_type="bbox")
         self.metric_prec = MeanAveragePrecision(iou_type="bbox", class_metrics=True)
 
-    # -- training / validation --
+    # ‑‑ training / validation ‑‑
     def training_step(self, batch, _):
         imgs, targets, _ = batch
         loss_dict = self.model(imgs, targets)
@@ -115,7 +115,7 @@ class DetectorModule(pl.LightningModule):
         self.log("val/macro_prec", p["precision"].mean(), prog_bar=True)
         self.metric_map.reset(); self.metric_prec.reset()
 
-    # -- test / crop --
+    # ‑‑ test / crop ‑‑
     def test_step(self, batch, _):
         imgs, _, names = batch
         preds = self.model(imgs)
@@ -135,7 +135,7 @@ class DetectorModule(pl.LightningModule):
                 crop = orig.crop((x1, y1, x2, y2))
                 crop.save(self.crop_dir / f"{Path(name).stem}_crop_{i}.jpg")
 
-    # -- optim --
+    # ‑‑ optim ‑‑
     def configure_optimizers(self):
         params = [p for p in self.model.parameters() if p.requires_grad]
         opt = torch.optim.SGD(params, lr=self.lr, momentum=0.9, weight_decay=1e-4)
@@ -205,10 +205,10 @@ def main(args):
 
 
 if __name__ == "__main__":
-    p = argparse.ArgumentParser(description="Faster R-CNN detector with LabelMe support and auto-crop output.")
+    p = argparse.ArgumentParser(description="Faster R‑CNN detector with LabelMe support and auto‑crop output.")
     p.add_argument("--data_dir",    required=True, type=str, help="Folder with images + LabelMe JSONs")
     p.add_argument("--output_dir",   default="./crops", type=str, help="Where to dump cropped detections")
-    p.add_argument("--img_exts",     default="jpg,jpeg,png", help="Comma-separated image extensions")
+    p.add_argument("--img_exts",     default="jpg,jpeg,png", help="Comma‑separated image extensions")
     p.add_argument("--epochs",       default=30, type=int)
     p.add_argument("--batch_size",   default=4, type=int)
     p.add_argument("--lr",           default=1e-4, type=float)
