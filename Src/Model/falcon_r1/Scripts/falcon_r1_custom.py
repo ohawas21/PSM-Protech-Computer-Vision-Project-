@@ -152,7 +152,11 @@ def main():
     def get_loader(split):
         if args.doot:
             img_paths = sorted(glob(os.path.join(args.root, '*.jpg')) + glob(os.path.join(args.root, '*.png')))
-            pairs = [(p, os.path.splitext(p)[0] + '.json') for p in img_paths]
+            pairs = []
+            for p in img_paths:
+                label_path = os.path.splitext(p)[0] + '.json'
+                if os.path.exists(label_path):
+                    pairs.append((p, label_path))
             split_idx = int(0.9 * len(pairs))
             subset = pairs[:split_idx] if split == 'train' else pairs[split_idx:]
             return DataLoader(PolygonToBoxDataset(paired_files=subset), batch_size=args.batch, shuffle=(split == 'train'))
