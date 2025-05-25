@@ -113,14 +113,23 @@ names: ['object']
         print("❌ Failed to launch YOLOv8 training:", e)
         return
 
+    # Copy best model to root directory and backup in models directory
+    best_model_src = os.path.join(root_dir, 'weights', 'best.pt')
+    if os.path.exists(best_model_src):
+        best_model_dst = os.path.join(root_dir, 'best.pt')
+        shutil.copy2(best_model_src, best_model_dst)
+        models_dir = os.path.join(root_dir, 'models')
+        os.makedirs(models_dir, exist_ok=True)
+        backup_model_dst = os.path.join(models_dir, 'best.pt')
+        shutil.copy2(best_model_src, backup_model_dst)
+
     # After training, run prediction on validation images and save results
     try:
         from ultralytics import YOLO
-        best_model_path = os.path.join(root_dir, 'weights', 'best.pt')
-        if not os.path.exists(best_model_path):
-            print(f"❌ Best model not found at {best_model_path}")
+        if not os.path.exists(best_model_src):
+            print(f"❌ Best model not found at {best_model_src}")
             return
-        model = YOLO(best_model_path)
+        model = YOLO(best_model_src)
         os.makedirs('runs/test_images', exist_ok=True)
         print("🚀 Running prediction on validation images...")
         model.predict(source=images_val_dir, save=True, save_dir='runs/test_images')
