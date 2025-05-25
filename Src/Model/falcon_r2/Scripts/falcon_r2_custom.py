@@ -65,7 +65,12 @@ def auto_train_pipeline(labelme_train, labelme_val, dataset_root, class_list, mo
 
         src_json_dir = Path(labelme_train if split == "train" else labelme_val)
         for json_file in Path(src_json_dir).rglob("*.json"):
-            data = json.load(open(json_file))
+            try:
+                with open(json_file) as f:
+                    data = json.load(f)
+            except json.JSONDecodeError:
+                print(f"[ERROR] Skipping corrupt JSON: {json_file.name}")
+                continue
             image_file = Path(src_json_dir, data["imagePath"])
             if image_file.exists():
                 os.system(f'cp "{image_file}" "{img_dir}/{image_file.name}"')  # copy images
