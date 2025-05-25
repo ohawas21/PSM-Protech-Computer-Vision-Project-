@@ -1,187 +1,301 @@
-# falcon_r2_custom.py
+# yolo_labelme_trainer.py
 """
-Faster R-CNN (ResNet-50 FPN) + Auto-Crop for LabelMe Datasets
-============================================================
-* **Zero-friction ingest**: `--img_exts jpg,png` (default) – any mixture allowed.
-* **LabelMe polygons ➜ axis-aligned bboxes** handled transparently.
-* **Robust train/val split**: stratified when ≥ 2 classes, plain otherwise.
-* **Missing annotation skip**: images without JSON are logged & ignored – training never aborts.
-* **Post-fit crop export**: every detection ≥ 0.50 confidence saved to `--output_dir`.
+YOLO Training Script for LabelMe Datasets
+=========================================
+Simple, robust YOLO training with automatic LabelMe JSON to YOLO format conversion.
 
-Install once
-------------
-```bash
-pip install torch torchvision torchmetrics pytorch-lightning==2.2.0 scikit-learn
-```
-Run
----
-```bash
-python falcon_r2_custom.py \
-       --data_dir ../Dataset \
-       --output_dir ./crops \
-       --img_exts png          # optional
-```
+Features:
+- Automatic LabelMe polygon → YOLO bbox conversion
+- Graceful handling of missing annotations
+- Auto train/val split
+- Crop extraction after training
+- GPU acceleration when available
+
+Install:
+-------
+pip install ultralytics pillow
+
+Usage:
+------
+python yolo_labelme_trainer.py --data_dir ../Dataset --img_exts png
 """
-from __future__ import annotations
 
 import argparse
 import json
 import logging
+import shutil
 from pathlib import Path
-from typing import List, Tuple, Dict, Sequence
+from typing import List, Tuple, Dict
+import yaml
 
-import pytorch_lightning as pl
-import torch
-import torchvision.transforms as T
 from PIL import Image
-from sklearn.model_selection import StratifiedShuffleSplit, train_test_split
-from torch.utils.data import DataLoader, Dataset
-from torchmetrics.detection.mean_ap import MeanAveragePrecision
+from ultralytics import YOLO
 
+# Setup logging
 logging.basicConfig(level=logging.INFO, format="%(levelname)s | %(message)s")
-log = logging.getLogger("falcon_r2")
+log = logging.getLogger("yolo_trainer")
 
-# ─────────────────────────────── util: LabelMe → bbox ──────────────────────────
+def labelme_to_yolo_bbox(points: List[List[float]], img_width: int, img_height: int) -> List[float]:
+    """Convert LabelMe polygon points to YOLO format bbox (normalized center_x, center_y, width, height)"""
+    xs, ys = zip(*points)
+    x_min, x_max = min(xs), max(xs)
+    y_min, y_max = min(ys), max(ys)
+    
+    # Convert to YOLO format (normalized)
+    center_x = (x_min + x_max) / 2 / img_width
+    center_y = (y_min + y_max) / 2 / img_height
+    width = (x_max - x_min) / img_width
+    height = (y_max - y_min) / img_height
+    
+    return [center_x, center_y, width, height]
 
-def _extract_boxes(img_path: Path) -> Tuple[List[List[float]], List[str]]:
-    """Return axis-aligned boxes & labels for *one* image.
-    Looks for multiple JSON naming patterns:
-    1. img.stem + .json (e.g., 80.png -> 80.json)
-    2. img.name + .json (e.g., 80.png -> 80.png.json)
-    3. Same directory structure but in different folders
-    
-    Raises FileNotFoundError if no JSON is found.
-    """
-    # Pattern 1: Replace extension with .json (most common)
-    cand1 = img_path.with_suffix(".json")
-    
-    # Pattern 2: Add .json to full filename
-    cand2 = img_path.with_suffix(img_path.suffix + ".json")
-    
-    # Check if either exists
-    json_path = None
-    if cand1.exists():
-        json_path = cand1
-    elif cand2.exists():
-        json_path = cand2
-    else:
-        # Log the specific files we looked for
-        log.debug(f"Checked for annotations: {cand1}, {cand2}")
-        raise FileNotFoundError(f"No JSON annotation found for {img_path.name}")
-
+def process_labelme_json(json_path: Path, img_width: int, img_height: int) -> Tuple[List[List[float]], List[str]]:
+    """Extract bounding boxes and labels from LabelMe JSON file"""
     try:
-        with open(json_path, encoding="utf-8") as f:
+        with open(json_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
-    except json.JSONDecodeError as e:
-        log.warning(f"Invalid JSON in {json_path}: {e}")
-        raise FileNotFoundError(f"Invalid JSON format in {json_path}")
-
-    boxes, labels = [], []
-    shapes = data.get("shapes", [])
+    except (json.JSONDecodeError, FileNotFoundError) as e:
+        log.warning(f"Could not read {json_path}: {e}")
+        return [], []
     
-    if not shapes:
-        log.warning(f"No shapes found in {json_path}")
-        return boxes, labels
+    bboxes = []
+    labels = []
     
-    for shp in shapes:
-        points = shp.get("points", [])
-        label = shp.get("label", "unknown")
+    for shape in data.get('shapes', []):
+        points = shape.get('points', [])
+        label = shape.get('label', 'unknown')
         
         if len(points) < 2:
-            log.warning(f"Skipping shape with insufficient points in {json_path}")
             continue
             
         try:
-            xs, ys = zip(*points)
-            boxes.append([min(xs), min(ys), max(xs), max(ys)])
+            bbox = labelme_to_yolo_bbox(points, img_width, img_height)
+            bboxes.append(bbox)
             labels.append(label)
-        except (ValueError, TypeError) as e:
-            log.warning(f"Skipping malformed shape in {json_path}: {e}")
+        except Exception as e:
+            log.warning(f"Error processing shape in {json_path}: {e}")
             continue
     
-    return boxes, labels
+    return bboxes, labels
 
-# ─────────────────────────────────── Dataset ───────────────────────────────────
-class LabelMeDetDataset(Dataset):
-    def __init__(self, files: Sequence[Path], label2idx: Dict[str, int], tfm: T.Compose):
-        self.files = list(files)
-        self.label2idx = label2idx
-        self.tfm = tfm
+def find_annotation_file(img_path: Path) -> Path:
+    """Find corresponding JSON annotation file for an image"""
+    # Try different naming conventions
+    candidates = [
+        img_path.with_suffix('.json'),  # img.png -> img.json
+        img_path.with_suffix(img_path.suffix + '.json'),  # img.png -> img.png.json
+    ]
+    
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    
+    raise FileNotFoundError(f"No annotation found for {img_path.name}")
 
-    def __len__(self):
-        return len(self.files)
+def convert_dataset_to_yolo(data_dir: Path, output_dir: Path, img_extensions: List[str]):
+    """Convert LabelMe dataset to YOLO format"""
+    log.info("Converting LabelMe dataset to YOLO format...")
+    
+    # Find all images
+    image_files = []
+    for ext in img_extensions:
+        image_files.extend(data_dir.glob(f"*.{ext.lstrip('.')}"))
+    
+    if not image_files:
+        raise FileNotFoundError(f"No images found with extensions {img_extensions} in {data_dir}")
+    
+    log.info(f"Found {len(image_files)} images")
+    
+    # Create output directories
+    train_img_dir = output_dir / "images" / "train"
+    val_img_dir = output_dir / "images" / "val"
+    train_label_dir = output_dir / "labels" / "train"
+    val_label_dir = output_dir / "labels" / "val"
+    
+    for dir_path in [train_img_dir, val_img_dir, train_label_dir, val_label_dir]:
+        dir_path.mkdir(parents=True, exist_ok=True)
+    
+    # Collect all valid images with annotations
+    valid_files = []
+    all_labels = set()
+    skipped_count = 0
+    
+    for img_path in image_files:
+        try:
+            json_path = find_annotation_file(img_path)
+            # Get image dimensions
+            with Image.open(img_path) as img:
+                img_width, img_height = img.size
+            
+            bboxes, labels = process_labelme_json(json_path, img_width, img_height)
+            
+            if not bboxes:
+                log.warning(f"Skip {img_path.name}: no valid annotations")
+                skipped_count += 1
+                continue
+            
+            valid_files.append((img_path, json_path, bboxes, labels))
+            all_labels.update(labels)
+            
+        except Exception as e:
+            log.warning(f"Skip {img_path.name}: {e}")
+            skipped_count += 1
+            continue
+    
+    if not valid_files:
+        raise RuntimeError("No valid annotated images found!")
+    
+    log.info(f"Valid images: {len(valid_files)}, Skipped: {skipped_count}")
+    log.info(f"Found classes: {sorted(all_labels)}")
+    
+    # Create class mapping
+    class_names = sorted(all_labels)
+    class_to_id = {name: idx for idx, name in enumerate(class_names)}
+    
+    # Split train/val (80/20)
+    split_idx = int(0.8 * len(valid_files))
+    train_files = valid_files[:split_idx]
+    val_files = valid_files[split_idx:]
+    
+    log.info(f"Train: {len(train_files)}, Val: {len(val_files)}")
+    
+    # Process train files
+    for img_path, json_path, bboxes, labels in train_files:
+        # Copy image
+        shutil.copy2(img_path, train_img_dir / img_path.name)
+        
+        # Create YOLO label file
+        label_file = train_label_dir / f"{img_path.stem}.txt"
+        with open(label_file, 'w') as f:
+            for bbox, label in zip(bboxes, labels):
+                class_id = class_to_id[label]
+                f.write(f"{class_id} {' '.join(map(str, bbox))}\n")
+    
+    # Process val files
+    for img_path, json_path, bboxes, labels in val_files:
+        # Copy image
+        shutil.copy2(img_path, val_img_dir / img_path.name)
+        
+        # Create YOLO label file
+        label_file = val_label_dir / f"{img_path.stem}.txt"
+        with open(label_file, 'w') as f:
+            for bbox, label in zip(bboxes, labels):
+                class_id = class_to_id[label]
+                f.write(f"{class_id} {' '.join(map(str, bbox))}\n")
+    
+    # Create dataset.yaml
+    dataset_yaml = {
+        'path': str(output_dir.absolute()),
+        'train': 'images/train',
+        'val': 'images/val',
+        'nc': len(class_names),
+        'names': class_names
+    }
+    
+    yaml_path = output_dir / "dataset.yaml"
+    with open(yaml_path, 'w') as f:
+        yaml.dump(dataset_yaml, f, default_flow_style=False)
+    
+    log.info(f"Dataset converted successfully!")
+    log.info(f"Dataset config saved to: {yaml_path}")
+    
+    return yaml_path, class_names
 
-    def __getitem__(self, idx):
-        img_path = self.files[idx]
-        boxes, labels_str = _extract_boxes(img_path)
-        labels = [self.label2idx[l] for l in labels_str]
+def train_yolo_model(dataset_yaml: Path, epochs: int, img_size: int, batch_size: int):
+    """Train YOLO model"""
+    log.info("Starting YOLO training...")
+    
+    # Initialize YOLO model
+    model = YOLO('yolov8n.pt')  # You can change to yolov8s.pt, yolov8m.pt, etc.
+    
+    # Train the model
+    results = model.train(
+        data=str(dataset_yaml),
+        epochs=epochs,
+        imgsz=img_size,
+        batch=batch_size,
+        save=True,
+        device='0' if hasattr(model, 'device') else 'cpu'  # Use GPU if available
+    )
+    
+    log.info("Training completed!")
+    return model
 
-        img = Image.open(img_path).convert("RGB")
-        img = self.tfm(img)
-        tgt = {
-            "boxes": torch.tensor(boxes, dtype=torch.float32),
-            "labels": torch.tensor(labels, dtype=torch.int64),
-        }
-        return img, tgt, img_path.name
+def extract_crops(model, data_dir: Path, output_dir: Path, conf_threshold: float = 0.5):
+    """Extract crops from trained model predictions"""
+    log.info("Extracting crops from predictions...")
+    
+    crop_dir = output_dir / "crops"
+    crop_dir.mkdir(exist_ok=True)
+    
+    # Find all images in original dataset
+    image_files = []
+    for ext in ['jpg', 'jpeg', 'png']:
+        image_files.extend(data_dir.glob(f"*.{ext}"))
+    
+    crop_count = 0
+    for img_path in image_files:
+        try:
+            # Run inference
+            results = model(str(img_path), conf=conf_threshold)
+            
+            # Extract crops
+            for i, result in enumerate(results):
+                if len(result.boxes) > 0:
+                    # Save crops
+                    crops = result.save_crop(
+                        save_dir=crop_dir,
+                        file_name=f"{img_path.stem}_crop"
+                    )
+                    crop_count += len(result.boxes)
+                    
+        except Exception as e:
+            log.warning(f"Error processing {img_path.name}: {e}")
+            continue
+    
+    log.info(f"Extracted {crop_count} crops to {crop_dir}")
 
+def main():
+    parser = argparse.ArgumentParser(description="YOLO Training for LabelMe Datasets")
+    parser.add_argument("--data_dir", required=True, help="Directory containing images and JSON annotations")
+    parser.add_argument("--output_dir", default="./yolo_dataset", help="Output directory for converted dataset")
+    parser.add_argument("--crops_dir", default="./crops", help="Directory to save extracted crops")
+    parser.add_argument("--img_exts", default="jpg,jpeg,png", help="Image extensions (comma-separated)")
+    parser.add_argument("--epochs", type=int, default=50, help="Number of training epochs")
+    parser.add_argument("--img_size", type=int, default=640, help="Training image size")
+    parser.add_argument("--batch_size", type=int, default=16, help="Batch size")
+    parser.add_argument("--conf_threshold", type=float, default=0.5, help="Confidence threshold for crop extraction")
+    
+    args = parser.parse_args()
+    
+    # Setup paths
+    data_dir = Path(args.data_dir)
+    output_dir = Path(args.output_dir)
+    crops_dir = Path(args.crops_dir)
+    
+    if not data_dir.exists():
+        raise FileNotFoundError(f"Data directory not found: {data_dir}")
+    
+    # Parse image extensions
+    img_extensions = [ext.strip().lstrip('.') for ext in args.img_exts.split(',')]
+    
+    try:
+        # Step 1: Convert dataset to YOLO format
+        dataset_yaml, class_names = convert_dataset_to_yolo(data_dir, output_dir, img_extensions)
+        
+        # Step 2: Train YOLO model
+        model = train_yolo_model(dataset_yaml, args.epochs, args.img_size, args.batch_size)
+        
+        # Step 3: Extract crops
+        extract_crops(model, data_dir, crops_dir, args.conf_threshold)
+        
+        log.info("All steps completed successfully!")
+        log.info(f"Model weights saved in: runs/detect/train/weights/best.pt")
+        log.info(f"Crops saved in: {crops_dir}")
+        
+    except Exception as e:
+        log.error(f"Training failed: {e}")
+        raise
 
-def collate_fn(batch):
-    imgs, tgts, names = zip(*batch)
-    return list(imgs), list(tgts), list(names)
-
-# ────────────────────────────── Lightning module ───────────────────────────────
-class Detector(pl.LightningModule):
-    def __init__(self, num_classes: int, lr: float, crop_dir: Path):
-        super().__init__()
-        from torchvision.models.detection import fasterrcnn_resnet50_fpn
-        self.model = fasterrcnn_resnet50_fpn(pretrained=True, num_classes=num_classes)
-        self.lr = lr
-        self.crop_dir = crop_dir
-        self.map = MeanAveragePrecision(iou_type="bbox")
-        self.macro_prec = MeanAveragePrecision(iou_type="bbox", class_metrics=True)
-
-    # — training —
-    def training_step(self, batch, _):
-        imgs, tgts, _ = batch
-        loss_dict = self.model(imgs, tgts)
-        loss = sum(loss_dict.values())
-        self.log_dict({f"train/{k}": v for k, v in loss_dict.items()})
-        return loss
-
-    # — validation —
-    def validation_step(self, batch, _):
-        imgs, tgts, _ = batch
-        preds = self.model(imgs)
-        self.map.update(preds, tgts)
-        self.macro_prec.update(preds, tgts)
-
-    def on_validation_epoch_end(self):
-        m = self.map.compute(); p = self.macro_prec.compute()
-        self.log("val/mAP50", m["map_50"], prog_bar=True)
-        self.log("val/macro_prec", p["precision"].mean(), prog_bar=True)
-        self.map.reset(); self.macro_prec.reset()
-
-    # — test / crop —
-    def test_step(self, batch, _):
-        imgs, _, names = batch
-        preds = self.model(imgs)
-        self._export_crops(imgs, preds, names, thr=0.5)
-
-    @torch.inference_mode()
-    def _export_crops(self, imgs, preds, names, thr):
-        self.crop_dir.mkdir(parents=True, exist_ok=True)
-        to_pil = T.ToPILImage()
-        for im, pr, n in zip(imgs, preds, names):
-            pil = to_pil(im.cpu())
-            for i, s in enumerate(pr["scores"]):
-                if s < thr: break
-                x1, y1, x2, y2 = map(int, pr["boxes"][i])
-                pil.crop((x1, y1, x2, y2)).save(self.crop_dir / f"{Path(n).stem}_crop_{i}.jpg")
-
-    def configure_optimizers(self):
-        params = [p for p in self.model.parameters() if p.requires_grad]
-        opt = torch.optim.SGD(params, lr=self.lr, momentum=0.9, weight_decay=1e-4)
-        sch = torch.optim.lr_scheduler.MultiStepLR(opt, milestones=[16, 22], gamma=0.1)
-        return [opt], [sch]
-
-# ───────────────────────────── dataset helpers ─────────────────────────────────
+if __name__ == "__main__":
+    main()
