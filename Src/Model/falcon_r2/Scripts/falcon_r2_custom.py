@@ -15,8 +15,12 @@ def convert_labelme_dataset(labelme_dir, yolo_label_dir, class_map):
     os.makedirs(yolo_label_dir, exist_ok=True)
 
     for json_file in Path(labelme_dir).rglob("*.json"):
-        with open(json_file, "r") as f:
-            data = json.load(f)
+        try:
+            with open(json_file, "r") as f:
+                data = json.load(f)
+        except json.JSONDecodeError:
+            print(f"[ERROR] Skipping corrupt JSON during conversion: {json_file.name}")
+            continue
 
         image_path = Path(labelme_dir, data["imagePath"])
         if not image_path.exists():
