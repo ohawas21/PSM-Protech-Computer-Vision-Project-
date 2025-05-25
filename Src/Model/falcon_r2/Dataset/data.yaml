@@ -1,0 +1,5 @@
+train: /home/studvaikmu5453/Project_PSE/PSM-Protech-Feasibility-Study/Src/Model/falcon_r2/Dataset/images/train
+val: /home/studvaikmu5453/Project_PSE/PSM-Protech-Feasibility-Study/Src/Model/falcon_r2/Dataset/images/val
+
+nc: 1
+names: ['object']
