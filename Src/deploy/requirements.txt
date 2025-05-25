@@ -1,9 +1,13 @@
 flask
-pillow
-opencv-python
+bootstrap-flask
+Pillow
+numpy
 torch
 ultralytics
-pdf2image
-camelot-py[cv]
+camelot-py
+opencv-python
 pandas
 openpyxl
+pdf2image
+python-magic
+pytesseract

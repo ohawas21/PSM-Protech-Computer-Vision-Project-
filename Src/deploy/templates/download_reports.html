@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Download Reports</title>
+    {{ bootstrap.load_css() }}
+    <style>
+        .container {
+            max-width: 800px;
+            margin-top: 50px;
+        }
+        .report-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border: 1px solid #eee;
+            margin-bottom: 10px;
+            border-radius: 5px;
+        }
+        .report-item span {
+            flex-grow: 1;
+        }
+        .report-item .btn-group {
+            margin-left: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2 class="text-center mb-4">Available Reports</h2>
+        <div class="mb-3">
+            <a href="{{ url_for('index') }}" class="btn btn-secondary">Back to Upload</a>
+        </div>
+        {% if reports %}
+            <ul class="list-unstyled">
+                {% for report_name in reports %}
+                    <li class="report-item" id="report-item-{{ report_name.replace('.', '_') }}">
+                        <span>{{ report_name }}</span>
+                        <div class="btn-group">
+                            <a href="{{ url_for('download_specific_file', filename=report_name) }}" class="btn btn-sm btn-success">Download</a>
+                            <button class="btn btn-sm btn-danger delete-report-btn" data-filename="{{ report_name }}">Delete</button>
+                        </div>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <div class="alert alert-info" role="alert">
+                No reports found in the 'outputs' directory.
+            </div>
+        {% endif %}
+    </div>
+
+    {{ bootstrap.load_js() }}
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const deleteButtons = document.querySelectorAll('.delete-report-btn');
+            deleteButtons.forEach(button => {
+                button.addEventListener('click', async function () {
+                    const filename = this.dataset.filename;
+                    if (!filename) {
+                        alert('No filename specified for deletion.');
+                        return;
+                    }
+
+                    if (!confirm(`Are you sure you want to delete ${filename}?`)) {
+                        return;
+                    }
+
+                    try {
+                        const response = await fetch("{{ url_for('delete_report') }}", {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ filename: filename })
+                        });
+                        const result = await response.json();
+
+                        if (result.success) {
+                            alert(result.message || 'Report deleted successfully.');
+                            // Remove the item from the list
+                            const reportItem = document.getElementById(`report-item-${filename.replace('.', '_')}`);
+                            if (reportItem) {
+                                reportItem.remove();
+                            }
+                            // If no reports left, show the "No reports found" message (optional)
+                            if (document.querySelectorAll('.report-item').length === 0) {
+                                const container = document.querySelector('.container');
+                                const noReportsDiv = document.createElement('div');
+                                noReportsDiv.className = 'alert alert-info';
+                                noReportsDiv.setAttribute('role', 'alert');
+                                noReportsDiv.textContent = "No reports found in the 'outputs' directory.";
+                                // Check if such a message already exists to avoid duplicates
+                                if (!container.querySelector('.alert.alert-info')) {
+                                     container.appendChild(noReportsDiv);
+                                }
+                            }
+                        } else {
+                            alert('Error deleting report: ' + (result.error || 'Unknown error'));
+                        }
+                    } catch (error) {
+                        console.error('Error during delete request:', error);
+                        alert('An error occurred while trying to delete the report: ' + error.message);
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
