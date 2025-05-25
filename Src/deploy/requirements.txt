@@ -1,0 +1,9 @@
+flask
+pillow
+opencv-python
+torch
+ultralytics
+pdf2image
+camelot-py[cv]
+pandas
+openpyxl
