@@ -72,35 +72,7 @@ def main():
             try:
                 with Image.open(img_path) as img:
                     width, height = img.size
-                    if width < 64 or height < 64:
-                        print(f"⚠️ Skipping small image {img_path} ({width}x{height})")
-                        continue
-
-                    # Crop large images into 2x2 grid if size permits
-                    if width >= 256 and height >= 256:
-                        tile_w, tile_h = width // 2, height // 2
-                        for i in range(2):
-                            for j in range(2):
-                                left = i * tile_w
-                                upper = j * tile_h
-                                right = left + tile_w
-                                lower = upper + tile_h
-                                crop = img.crop((left, upper, right, lower))
-                                crop_filename = f"{base_name}_{i}_{j}.png"
-                                crop_path = os.path.join(images_dir, crop_filename)
-                                crop.save(crop_path)
-
-                                label_path = os.path.join(labels_dir, f"{os.path.splitext(crop_filename)[0]}.txt")
-                                # We use the same original annotation for cropped images (approximate)
-                                yolo_lines = convert_labelme_to_yolo(json_path, (width, height))
-                                if yolo_lines:
-                                    with open(label_path, 'w') as f:
-                                        f.write('\n'.join(yolo_lines))
-                                else:
-                                    open(label_path, 'w').close()
-                        continue
-                    else:
-                        yolo_lines = convert_labelme_to_yolo(json_path, (width, height))
+                yolo_lines = convert_labelme_to_yolo(json_path, (width, height))
             except Exception as e:
                 print(f"❌ Failed to process {img_path}: {e}")
                 continue
@@ -129,28 +101,10 @@ names: ['object']
         f.write(data_yaml)
 
     train_cmd = [
-        'yolo', 'train',
-        'task=detect',
-        f'model=yolov8n.pt',
+        'yolo', 'task=detect', 'mode=train',
+        'model=yolov8n.pt',
         f'data={os.path.join(root_dir, "data.yaml")}',
-        'epochs=3000',
-        'imgsz=640',
-        'batch=8',
-        'patience=100',
-        'lr0=0.005',
-        'augment=True',
-        'hsv_h=0.015',
-        'hsv_s=0.7',
-        'hsv_v=0.4',
-        'degrees=0.0',
-        'translate=0.1',
-        'scale=0.5',
-        'shear=0.1',
-        'perspective=0.0',
-        'flipud=0.0',
-        'fliplr=0.5',
-        'mosaic=1.0',
-        'mixup=0.2'
+        'epochs=3000'
     ]
     print("🚀 Starting YOLOv8 training...")
     try:
