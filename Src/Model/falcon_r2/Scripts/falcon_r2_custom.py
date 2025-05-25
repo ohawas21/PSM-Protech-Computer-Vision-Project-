@@ -102,7 +102,7 @@ names: ['object']
 
     train_cmd = [
         'yolo', 'task=detect', 'mode=train',
-        'model=yolov8n.pt',
+        'model=yolov8m.pt',
         f'data={os.path.join(root_dir, "data.yaml")}',
         'epochs=3000'
     ]
