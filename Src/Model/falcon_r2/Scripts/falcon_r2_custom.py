@@ -15,7 +15,7 @@ def polygon_to_bbox(points):
     y_min, y_max = min(ys), max(ys)
     return x_min, y_min, x_max, y_max
 
-def convert_labelme_to_yolo(json_path, img_size):
+def convert_labelme_to_yolo(json_path, img_size, class_map):
     with open(json_path, 'r') as f:
         data = json.load(f)
 
@@ -24,8 +24,10 @@ def convert_labelme_to_yolo(json_path, img_size):
 
     for shape in data.get('shapes', []):
         points = shape.get('points', [])
-        if not points:
+        label = shape.get('label', 'object')
+        if not points or label not in class_map:
             continue
+        class_id = class_map[label]
         x_min, y_min, x_max, y_max = polygon_to_bbox(points)
 
         x_center = ((x_min + x_max) / 2) / width
@@ -33,7 +35,7 @@ def convert_labelme_to_yolo(json_path, img_size):
         w = (x_max - x_min) / width
         h = (y_max - y_min) / height
 
-        yolo_lines.append(f"0 {x_center:.6f} {y_center:.6f} {w:.6f} {h:.6f}")
+        yolo_lines.append(f"{class_id} {x_center:.6f} {y_center:.6f} {w:.6f} {h:.6f}")
 
     return yolo_lines
 
@@ -49,6 +51,17 @@ def main():
         image_files.extend(glob(os.path.join(root_dir, f'*{ext}')))
     image_files = sorted(image_files)
 
+    labels = set()
+    for ext in img_exts:
+        for json_file in glob(os.path.join(root_dir, f'*{ext.replace(".", ".json")}')):
+            with open(json_file, 'r') as f:
+                data = json.load(f)
+                for shape in data.get('shapes', []):
+                    label = shape.get('label', 'object')
+                    labels.add(label)
+    class_list = sorted(labels)
+    class_map = {label: idx for idx, label in enumerate(class_list)}
+
     random.seed(42)
     random.shuffle(image_files)
     n_total = len(image_files)
@@ -63,7 +76,7 @@ def main():
     for d in [images_train_dir, images_val_dir, labels_train_dir, labels_val_dir]:
         os.makedirs(d, exist_ok=True)
 
-    def process_and_save(img_paths, images_dir, labels_dir):
+    def process_and_save(img_paths, images_dir, labels_dir, class_map):
         for img_path in img_paths:
             base_name = os.path.splitext(os.path.basename(img_path))[0]
             json_path = os.path.join(root_dir, base_name + '.json')
@@ -72,7 +85,7 @@ def main():
             try:
                 with Image.open(img_path) as img:
                     width, height = img.size
-                yolo_lines = convert_labelme_to_yolo(json_path, (width, height))
+                yolo_lines = convert_labelme_to_yolo(json_path, (width, height), class_map)
             except Exception as e:
                 print(f"❌ Failed to process {img_path}: {e}")
                 continue
@@ -86,16 +99,16 @@ def main():
             else:
                 open(label_path, 'w').close()
 
-    process_and_save(train_imgs, images_train_dir, labels_train_dir)
-    process_and_save(val_imgs, images_val_dir, labels_val_dir)
+    process_and_save(train_imgs, images_train_dir, labels_train_dir, class_map)
+    process_and_save(val_imgs, images_val_dir, labels_val_dir, class_map)
 
     data_yaml = f"""\
 path: {root_dir}
 train: images/train
 val: images/val
 
-nc: 1
-names: ['object']
+nc: {len(class_list)}
+names: {class_list}
 """
     with open(os.path.join(root_dir, 'data.yaml'), 'w') as f:
         f.write(data_yaml)
