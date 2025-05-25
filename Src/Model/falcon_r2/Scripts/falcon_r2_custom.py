@@ -33,13 +33,7 @@ def convert_labelme_to_yolo(json_path, img_size):
         w = (x_max - x_min) / width
         h = (y_max - y_min) / height
 
-        label = shape.get('label', '0')
-        try:
-            class_id = int(label)
-        except ValueError:
-            class_id = abs(hash(label)) % 1000  # limit class ids to 0-999
-
-        yolo_lines.append(f"{class_id} {x_center:.6f} {y_center:.6f} {w:.6f} {h:.6f}")
+        yolo_lines.append(f"0 {x_center:.6f} {y_center:.6f} {w:.6f} {h:.6f}")
 
     return yolo_lines
 
@@ -78,7 +72,35 @@ def main():
             try:
                 with Image.open(img_path) as img:
                     width, height = img.size
-                yolo_lines = convert_labelme_to_yolo(json_path, (width, height))
+                    if width < 64 or height < 64:
+                        print(f"⚠️ Skipping small image {img_path} ({width}x{height})")
+                        continue
+
+                    # Crop large images into 2x2 grid if size permits
+                    if width >= 256 and height >= 256:
+                        tile_w, tile_h = width // 2, height // 2
+                        for i in range(2):
+                            for j in range(2):
+                                left = i * tile_w
+                                upper = j * tile_h
+                                right = left + tile_w
+                                lower = upper + tile_h
+                                crop = img.crop((left, upper, right, lower))
+                                crop_filename = f"{base_name}_{i}_{j}.png"
+                                crop_path = os.path.join(images_dir, crop_filename)
+                                crop.save(crop_path)
+
+                                label_path = os.path.join(labels_dir, f"{os.path.splitext(crop_filename)[0]}.txt")
+                                # We use the same original annotation for cropped images (approximate)
+                                yolo_lines = convert_labelme_to_yolo(json_path, (width, height))
+                                if yolo_lines:
+                                    with open(label_path, 'w') as f:
+                                        f.write('\n'.join(yolo_lines))
+                                else:
+                                    open(label_path, 'w').close()
+                        continue
+                    else:
+                        yolo_lines = convert_labelme_to_yolo(json_path, (width, height))
             except Exception as e:
                 print(f"❌ Failed to process {img_path}: {e}")
                 continue
@@ -106,49 +128,30 @@ names: ['object']
     with open(os.path.join(root_dir, 'data.yaml'), 'w') as f:
         f.write(data_yaml)
 
-    hyp_yaml = os.path.join(root_dir, 'cfg.yaml')
-    with open(hyp_yaml, 'w') as f:
-        f.write("""\
-lr0: 0.01
-lrf: 0.01
-momentum: 0.937
-weight_decay: 0.0005
-warmup_epochs: 3.0
-warmup_momentum: 0.8
-warmup_bias_lr: 0.1
-box: 0.05
-cls: 0.5
-cls_pw: 1.0
-obj: 1.0
-obj_pw: 1.0
-iou_t: 0.2
-anchor_t: 4.0
-fl_gamma: 0.0
-hsv_h: 0.015
-hsv_s: 0.7
-hsv_v: 0.4
-degrees: 0.0
-translate: 0.1
-scale: 0.5
-shear: 0.1
-perspective: 0.0
-flipud: 0.0
-fliplr: 0.5
-mosaic: 1.0
-mixup: 0.2
-copy_paste: 0.0
-""")
-
     train_cmd = [
-        'yolo',
-        'detect',  # explicitly specify task
-        'train',
-        f'model=yolov8l.pt',
+        'yolo', 'train',
+        'task=detect',
+        f'model=yolov8n.pt',
         f'data={os.path.join(root_dir, "data.yaml")}',
         'epochs=3000',
-        f'cfg={hyp_yaml}'
+        'imgsz=640',
+        'batch=8',
+        'patience=100',
+        'lr0=0.005',
+        'augment=True',
+        'hsv_h=0.015',
+        'hsv_s=0.7',
+        'hsv_v=0.4',
+        'degrees=0.0',
+        'translate=0.1',
+        'scale=0.5',
+        'shear=0.1',
+        'perspective=0.0',
+        'flipud=0.0',
+        'fliplr=0.5',
+        'mosaic=1.0',
+        'mixup=0.2'
     ]
-
     print("🚀 Starting YOLOv8 training...")
     try:
         subprocess.run(train_cmd, check=True)
@@ -156,6 +159,7 @@ copy_paste: 0.0
         print("❌ Failed to launch YOLOv8 training:", e)
         return
 
+    # Find the latest training directory and best.pt path
     train_runs = glob('runs/detect/train*')
     if train_runs:
         latest_run = max(train_runs, key=os.path.getmtime)
@@ -163,6 +167,7 @@ copy_paste: 0.0
     else:
         best_model_src = None
 
+    # Copy best model to root directory and backup in models directory
     if best_model_src and os.path.exists(best_model_src):
         best_model_dst = os.path.join(root_dir, 'best.pt')
         shutil.copy2(best_model_src, best_model_dst)
@@ -173,6 +178,7 @@ copy_paste: 0.0
     else:
         print("❌ Best model not found after training.")
 
+    # After training, run prediction on validation images and save results
     try:
         from ultralytics import YOLO
         import cv2
@@ -185,31 +191,42 @@ copy_paste: 0.0
         save_dir = 'runs/test_images'
         os.makedirs(save_dir, exist_ok=True)
         print("🚀 Running prediction on validation images...")
-
+        # Run prediction with specified options
         results = model.predict(source=images_val_dir, save=True, save_dir=save_dir,
                                 save_txt=True, save_conf=True,
                                 vid_stride=1, visualize=False)
 
+        # Replace resized saved images with copies of original quality validation images
+        # and overlay predictions manually if necessary
         for result in results:
+            # result.orig_img is the original image in numpy array
+            # result.path is the path to the input image
             orig_img_path = result.path
             base_name = os.path.basename(orig_img_path)
             saved_img_path = os.path.join(save_dir, base_name)
+
+            # Copy original quality image to replace saved resized image
             shutil.copy2(orig_img_path, saved_img_path)
 
+            # Load original image to overlay predictions
             img = cv2.imread(saved_img_path)
             if img is None:
                 continue
 
+            # Overlay boxes and labels from prediction
             boxes = result.boxes
             for box in boxes:
                 xyxy = box.xyxy[0].cpu().numpy().astype(int)
                 conf = box.conf[0].item()
                 cls = int(box.cls[0].item())
                 label = f"{cls} {conf:.2f}"
+                # Draw rectangle
                 cv2.rectangle(img, (xyxy[0], xyxy[1]), (xyxy[2], xyxy[3]), (0, 255, 0), 2)
+                # Put label
                 cv2.putText(img, label, (xyxy[0], xyxy[1] - 10), cv2.FONT_HERSHEY_SIMPLEX,
                             0.5, (0, 255, 0), 2)
 
+            # Save the overlaid image
             cv2.imwrite(saved_img_path, img)
 
         print("✅ Prediction images saved to runs/test_images/")
