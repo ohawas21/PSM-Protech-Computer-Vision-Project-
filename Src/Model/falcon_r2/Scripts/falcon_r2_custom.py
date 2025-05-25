@@ -53,8 +53,8 @@ def generate_data_yaml(save_path, class_map, train_img, val_img):
         f.write(f"train: {Path(train_img).parent.name}/images\n")
         f.write(f"val: {Path(val_img).parent.name}/images\n")
         f.write("names:\n")
-        for i, name in class_map.items():
-            f.write(f"  {name}: '{i}'\n")
+        for id, name in class_map.items():
+            f.write(f"  {id}: '{name}'\n")
 
 # 3. Auto pipeline
 def auto_train_pipeline(labelme_train, labelme_val, dataset_root, class_list, model_path='yolov8l-seg.pt'):
