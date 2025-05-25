@@ -1,56 +1,131 @@
 import os
-import pandas as pd
+import re
 import logging
-from ultralytics import YOLO
+from pathlib import Path
+from io import BytesIO
+import warnings
 
-INPUT_FOLDER = 'falcon_r4'
-OUTPUT_FOLDER = 'output'
-os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+import cv2
+import numpy as np
+import camelot
+import pandas as pd
+from PIL import Image
+from pdf2image import convert_from_bytes
+import pytesseract
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', filename='progress.log', filemode='a')
+# Configuration
+IMAGE_DIR   = Path("falcon_r4")
+OUTPUT_DIR  = Path("output")
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+OUTPUT_CSV  = OUTPUT_DIR / "final_output.csv"
 
-# Dynamically load the model based on the script name
-script_name = os.path.splitext(os.path.basename(__file__))[0]
-MODEL_PATH = f'models/{script_name}.pt'
+# Logging setup
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    filename='progress.log',
+    filemode='a'
+)
+logger = logging.getLogger(__name__)
 
-# Check if the model file exists
-if not os.path.exists(MODEL_PATH):
-    logging.error(f'Model file not found: {MODEL_PATH}')
+# Tesseract config
+TESS_CONFIG = "--psm 7 --oem 3 -c tessedit_char_whitelist=0123456789."
+warnings.filterwarnings('ignore', category=UserWarning)
 
-# Load the YOLO model using the ultralytics library
-try:
-    model = YOLO(MODEL_PATH)
-except FileNotFoundError as e:
-    logging.error(f"Failed to load YOLO model: {e}")
-    model = None  # Set model to None to indicate failure
+class TableOCRExtractor:
+    def __init__(self, image_dir: Path):
+        self.image_dir = image_dir
+        self.pdf_dir   = image_dir.parent / "temp_pdfs"
+        self.pdf_dir.mkdir(parents=True, exist_ok=True)
+        self.results = []
 
-# Update the extract_data function to skip processing if the model is None
-def extract_data():
-    if model is None:
-        logging.error("Skipping data extraction as the model could not be loaded.")
-        return
+    def convert_image_to_pdf(self, img_path: Path) -> Path:
+        buf = BytesIO()
+        Image.open(img_path).convert("RGB").save(buf, format="PDF")
+        buf.seek(0)
+        pdf_path = self.pdf_dir / f"{img_path.stem}.pdf"
+        pdf_path.write_bytes(buf.getvalue())
+        return pdf_path
 
-    logging.info('Starting falcon_r4 data extraction...')
-    excel_path = os.path.join(OUTPUT_FOLDER, 'final_output.xlsx')
-    writer = pd.ExcelWriter(excel_path, engine='openpyxl')
+    def try_camelot(self, pdf_path: Path, name: str):
+        try:
+            tables = camelot.read_pdf(str(pdf_path), flavor="stream", pages="1")
+            if tables:
+                df = tables[0].df
+                c2 = df.iloc[0,1].strip()
+                c3 = df.iloc[0,2].strip()
+                logger.info("  ✔ Camelot parsed %s → %s, %s", name, c2, c3)
+                return c2, c3
+        except Exception as e:
+            logger.warning("  Camelot error on %s: %s", name, e)
+        return None
 
-    for class_folder in os.listdir(INPUT_FOLDER):
-        class_path = os.path.join(INPUT_FOLDER, class_folder)
-        if os.path.isdir(class_path):
-            logging.info(f'Processing folder: {class_folder}')
-            for file_name in os.listdir(class_path):
-                file_path = os.path.join(class_path, file_name)
-                logging.info(f'Processing file: {file_name}')
-                results = model.predict(source=file_path, save=False)  # Perform inference
-                for i, result in enumerate(results):
-                    # Save extracted data to Excel
-                    output_excel_path = os.path.join(OUTPUT_FOLDER, f"{class_folder}_{i}.xlsx")
-                    with pd.ExcelWriter(output_excel_path, engine='openpyxl') as writer:
-                        result.pandas().xyxy.to_excel(writer, index=False)
-            logging.info(f'Folder processed and data saved to {OUTPUT_FOLDER}: {class_folder}')
-    writer.save()
-    logging.info('falcon_r4 data extraction completed.')
+    def render_pdf_to_image(self, pdf_path: Path) -> Image.Image | None:
+        try:
+            pages = convert_from_bytes(pdf_path.read_bytes(), dpi=300)
+            return pages[0] if pages else None
+        except Exception as e:
+            logger.error("  PDF rendering error for %s: %s", pdf_path.name, e)
+            return None
+
+    def crop_columns(self, img: Image.Image) -> tuple[Image.Image, Image.Image]:
+        W, H = img.size
+        x1 = int(W * 0.20)
+        x2 = int(W * 0.60)
+        x3 = int(W * 0.98)
+        col2_img = img.crop((x1, 0, x2, H))
+        col3_img = img.crop((x2, 0, x3, H))
+        return col2_img, col3_img
+
+    def preprocess(self, region: Image.Image) -> Image.Image:
+        arr = cv2.cvtColor(np.array(region), cv2.COLOR_RGB2GRAY)
+        blur = cv2.GaussianBlur(arr, (3,3), 0)
+        _, th = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        inv = cv2.bitwise_not(th)
+        up = cv2.resize(inv, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
+        return Image.fromarray(up)
+
+    def ocr_region(self, region: Image.Image, name: str, label: str) -> str | None:
+        prep = self.preprocess(region)
+        txt = pytesseract.image_to_string(prep, config=TESS_CONFIG).strip()
+        snippet = txt.replace("\n", " ")[:40]
+        logger.info("    OCR[%s] snippet: '%s...';", label, snippet)
+        m = re.search(r"\d+\.\d+", txt)
+        if m:
+            val = m.group(0)
+            logger.info("    → %s = %s", label, val)
+            return val
+        logger.warning("    ⚠️ %s region %s: no decimal found", name, label)
+        return None
+
+    def run(self):
+        logger.info("+++ Starting hybrid Camelot+OCR pipeline +++")
+        imgs = sorted(self.image_dir.glob("*.*"))
+        imgs = [p for p in imgs if p.suffix.lower() in {'.png','.jpg','.jpeg','.tif','.tiff'}]
+        logger.info(f"Processing {len(imgs)} images...")
+
+        for img_path in imgs:
+            name = img_path.stem
+            logger.info(f"Processing '{name}'")
+
+            pdf = self.convert_image_to_pdf(img_path)
+            res = self.try_camelot(pdf, name)
+            if not res:
+                page_img = self.render_pdf_to_image(pdf)
+                if page_img:
+                    col2_img, col3_img = self.crop_columns(page_img)
+                    v2 = self.ocr_region(col2_img, name, 'col2')
+                    v3 = self.ocr_region(col3_img, name, 'col3')
+                    if v2 and v3:
+                        res = (v2, v3)
+
+            if res:
+                c2, c3 = res
+                self.results.append({'source_image': name, 'col2': c2, 'col3': c3})
+
+        df = pd.DataFrame(self.results)
+        df.to_csv(OUTPUT_CSV, index=False)
+        logger.info("✅ Saved %d rows to %s", len(df), OUTPUT_CSV)
 
 if __name__ == "__main__":
-    extract_data()
+    TableOCRExtractor(IMAGE_DIR).run()
