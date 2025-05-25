@@ -1,149 +1,110 @@
 import os
 import json
-from pathlib import Path
-from PIL import Image
-from ultralytics import YOLO
 import argparse
-import random
 import shutil
+import subprocess
+import random
+from glob import glob
+from PIL import Image
 
-# 1. Convert LabelMe JSON to YOLO Segmentation Format
-def convert_polygon_to_yolo(points, img_w, img_h):
-    return [coord / img_w if i % 2 == 0 else coord / img_h for i, coord in enumerate(sum(points, []))]
+def convert_labelme_to_yolo_seg(json_path, img_size):
+    with open(json_path, 'r') as f:
+        data = json.load(f)
 
-def convert_labelme_dataset(labelme_dir, yolo_label_dir, class_map):
-    os.makedirs(yolo_label_dir, exist_ok=True)
+    width, height = img_size
+    yolo_lines = []
 
-    for json_file in Path(labelme_dir).rglob("*.json"):
-        try:
-            with open(json_file, "r") as f:
-                data = json.load(f)
-        except json.JSONDecodeError:
-            print(f"[ERROR] Skipping corrupt JSON during conversion: {json_file.name}")
+    for shape in data.get('shapes', []):
+        points = shape.get('points', [])
+        if not points:
             continue
+        norm_points = []
+        for x, y in points:
+            norm_points.extend([f"{x / width:.6f}", f"{y / height:.6f}"])
+        yolo_lines.append(f"0 {' '.join(norm_points)}")
+    return yolo_lines
 
-        image_path = Path(labelme_dir, data["imagePath"])
-        if not image_path.exists():
-            print(f"[WARN] Image not found for {json_file.name}, skipping.")
-            continue
+def process_dataset(root_dir):
+    # Collect all image files
+    image_exts = ['.jpg', '.jpeg', '.png']
+    image_files = [f for ext in image_exts for f in glob(os.path.join(root_dir, f'*{ext}'))]
+    image_files = sorted(image_files)
 
-        with Image.open(image_path) as img:
-            img_w, img_h = img.size
+    # Shuffle and split
+    random.seed(42)
+    random.shuffle(image_files)
+    split_idx = int(0.8 * len(image_files))
+    train_imgs = image_files[:split_idx]
+    val_imgs = image_files[split_idx:]
 
-        output_lines = []
-        for shape in data["shapes"]:
-            if shape["shape_type"] != "polygon":
+    # Prepare directories
+    dirs = {
+        'images/train': os.path.join(root_dir, 'images/train'),
+        'images/val': os.path.join(root_dir, 'images/val'),
+        'labels/train': os.path.join(root_dir, 'labels/train'),
+        'labels/val': os.path.join(root_dir, 'labels/val'),
+    }
+    for key, path in dirs.items():
+        if not os.path.exists(path):
+            os.makedirs(path, exist_ok=True)
+
+    def handle_split(split_imgs, split):
+        for img_path in split_imgs:
+            base = os.path.splitext(os.path.basename(img_path))[0]
+            json_path = os.path.join(root_dir, base + '.json')
+            if not os.path.exists(json_path):
                 continue
-
-            class_id = class_map.get(shape["label"])
-            if class_id is None:
-                print(f"[WARN] Unknown label: {shape['label']}")
-                continue
-
-            norm_coords = convert_polygon_to_yolo(shape["points"], img_w, img_h)
-            output_lines.append(f"{class_id} " + " ".join(f"{v:.6f}" for v in norm_coords))
-
-        with open(Path(yolo_label_dir, json_file.stem + ".txt"), "w") as f:
-            f.write("\n".join(output_lines))
-
-# 2. Generate data.yaml
-def generate_data_yaml(save_path, class_map, train_img, val_img):
-    with open(save_path, "w") as f:
-        f.write(f"path: {Path(train_img).parent.parent.resolve()}\n")
-        f.write(f"train: {Path(train_img).parent.as_posix()}\n")
-        f.write(f"val: {Path(val_img).parent.as_posix()}\n")
-        f.write("names:\n")
-        for id, name in class_map.items():
-            f.write(f"  {id}: '{name}'\n")
-
-# 3. Auto pipeline
-def auto_train_pipeline(labelme_train, labelme_val, dataset_root, class_list, model_path='yolov8l-seg.pt'):
-    class_map = {label: idx for idx, label in enumerate(class_list)}
-    structure = ['train', 'val']
-
-    for split in structure:
-        img_dir = Path(dataset_root, split, "images")
-        lbl_dir = Path(dataset_root, split, "labels")
-        os.makedirs(img_dir, exist_ok=True)
-        os.makedirs(lbl_dir, exist_ok=True)
-
-        src_json_dir = Path(labelme_train if split == "train" else labelme_val)
-        for json_file in Path(src_json_dir).rglob("*.json"):
             try:
-                with open(json_file) as f:
-                    data = json.load(f)
-            except json.JSONDecodeError:
-                print(f"[ERROR] Skipping corrupt JSON: {json_file.name}")
-                continue
-            image_file = Path(src_json_dir, data["imagePath"])
-            if image_file.exists():
-                os.system(f'cp "{image_file}" "{img_dir}/{image_file.name}"')  # copy images
+                with Image.open(img_path) as img:
+                    size = img.size
+                yolo_lines = convert_labelme_to_yolo_seg(json_path, size)
+                if not yolo_lines:
+                    continue
+                shutil.copy2(img_path, os.path.join(dirs[f'images/{split}'], os.path.basename(img_path)))
+                label_path = os.path.join(dirs[f'labels/{split}'], base + '.txt')
+                with open(label_path, 'w') as f:
+                    f.write('\n'.join(yolo_lines))
+            except Exception as e:
+                print(f"Error processing {img_path}: {e}")
 
-        convert_labelme_dataset(src_json_dir, lbl_dir, class_map)
+    handle_split(train_imgs, 'train')
+    handle_split(val_imgs, 'val')
 
-    yaml_path = Path(dataset_root, "data.yaml")
-    sample_train_img = next(Path(dataset_root, "train", "images").glob("*.png"))
-    sample_val_img = next(Path(dataset_root, "val", "images").glob("*.png"))
-    generate_data_yaml(yaml_path, {v: k for k, v in class_map.items()}, sample_train_img, sample_val_img)
+    return dirs['images/train'], dirs['images/val']
 
-    # 4. Train YOLOv8
-    model = YOLO(model_path)
-    model.train(
-        data=str(yaml_path),
-        epochs=300,
-        imgsz=640,
-        task="segment",
-        name="auto_seg_train"
-    )
+def write_data_yaml(root_dir, train_dir, val_dir):
+    data_yaml = f"""\
+train: {train_dir}
+val: {val_dir}
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Train YOLOv8 segmentation model from LabelMe data")
-    parser.add_argument("--root", type=str, required=True, help="Root directory containing LabelMe JSON and images")
+nc: 1
+names: ['object']
+"""
+    yaml_path = os.path.join(root_dir, 'data.yaml')
+    with open(yaml_path, 'w') as f:
+        f.write(data_yaml)
+    return yaml_path
+
+def train_model(data_yaml_path):
+    cmd = [
+        'yolo', 'task=segment', 'mode=train',
+        'model=yolov8l-seg.pt',
+        f'data={data_yaml_path}',
+        'epochs=300',
+        'imgsz=640'
+    ]
+    subprocess.run(cmd, check=True)
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--root', required=True, help='Root directory with .json and image files')
     args = parser.parse_args()
 
-    root_path = Path(args.root)
-    all_jsons = list(root_path.rglob("*.json"))
-    random.seed(42)
-    random.shuffle(all_jsons)
+    root = os.path.abspath(args.root)
+    train_dir, val_dir = process_dataset(root)
+    yaml_path = write_data_yaml(root, train_dir, val_dir)
+    print("✅ Dataset prepared. Starting training...")
+    train_model(yaml_path)
 
-    split_idx = int(0.8 * len(all_jsons))
-    train_jsons = all_jsons[:split_idx]
-    val_jsons = all_jsons[split_idx:]
-
-    tmp_root = Path("Dataset_split")
-    labelme_train = tmp_root / "labelme_train"
-    labelme_val = tmp_root / "labelme_val"
-    os.makedirs(labelme_train, exist_ok=True)
-    os.makedirs(labelme_val, exist_ok=True)
-
-    for f in train_jsons:
-        shutil.copy(f, labelme_train / f.name)
-        try:
-            with open(f) as jf:
-                data = json.load(jf)
-            img_file = f.parent / data["imagePath"]
-        except json.JSONDecodeError:
-            print(f"[ERROR] Skipping corrupt JSON: {f.name}")
-            continue
-        if img_file.exists():
-            shutil.copy(img_file, labelme_train / img_file.name)
-
-    for f in val_jsons:
-        shutil.copy(f, labelme_val / f.name)
-        try:
-            with open(f) as jf:
-                data = json.load(jf)
-            img_file = f.parent / data["imagePath"]
-        except json.JSONDecodeError:
-            print(f"[ERROR] Skipping corrupt JSON: {f.name}")
-            continue
-        if img_file.exists():
-            shutil.copy(img_file, labelme_val / img_file.name)
-
-    auto_train_pipeline(
-        labelme_train=labelme_train,
-        labelme_val=labelme_val,
-        dataset_root="Dataset",  # will structure Dataset/train/images etc.
-        class_list=["falcon_r2"],  # can be extended
-        model_path="yolov8l-seg.pt"
-    )
+if __name__ == '__main__':
+    main()
