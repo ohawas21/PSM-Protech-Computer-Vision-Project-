@@ -87,10 +87,10 @@ names: ['object']
 
 def train_model(data_yaml_path):
     cmd = [
-        'yolo', 'task=segment', 'mode=train',
-        'model=yolo11l.pt',
+        'yolo', 'task=detect', 'mode=train',
+        'model=yolo8n.pt',
         f'data={data_yaml_path}',
-        'epochs=300',
+        'epochs=3000',
         'imgsz=640'
     ]
     subprocess.run(cmd, check=True)
