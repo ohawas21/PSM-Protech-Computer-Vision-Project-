@@ -6,7 +6,7 @@ from PIL import Image, ImageDraw
 from torch.utils.data import Dataset, DataLoader
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
-from torchvision.models import resnet50
+from torchvision.models import efficientnet_b0
 from torch.cuda.amp import autocast, GradScaler
 
 IMG_WIDTH, IMG_HEIGHT = 1920, 1080  # ↓ Reduced from 4K
@@ -64,12 +64,12 @@ class PolygonToBoxDataset(Dataset):
 class StrongDetector(nn.Module):
     def __init__(self):
         super().__init__()
-        backbone = resnet50(weights='DEFAULT')
+        backbone = efficientnet_b0(weights='DEFAULT')
         for param in backbone.parameters(): param.requires_grad = False
-        self.feature_extractor = nn.Sequential(*list(backbone.children())[:-2])
+        self.feature_extractor = backbone.features
         self.pool = nn.AdaptiveAvgPool2d((1, 1))
         self.regressor = nn.Sequential(
-            nn.Flatten(), nn.Linear(2048, 512), nn.ReLU(),
+            nn.Flatten(), nn.Linear(1280, 512), nn.ReLU(),
             nn.Dropout(0.3), nn.Linear(512, 256), nn.ReLU(), nn.Linear(256, 4)
         )
     def forward(self, x):
@@ -193,9 +193,9 @@ def main():
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
 
     def unfreeze_last_resnet_block(model):
-        # Unfreeze layer4 of resnet50 backbone
+        # Unfreeze last 3 blocks of efficientnet_b0 backbone
         for name, param in model.feature_extractor.named_parameters():
-            if name.startswith('6.'):  # layer4 is the 7th child (index 6)
+            if name.startswith('6.') or name.startswith('7.') or name.startswith('8.'):
                 param.requires_grad = True
 
     def get_loader(split):
