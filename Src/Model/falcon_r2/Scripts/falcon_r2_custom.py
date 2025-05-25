@@ -2,12 +2,12 @@
 """
 Object Detection + Automated Cropping Pipeline
 =============================================
-Fine-tune **Faster R-CNN ResNet-50 FPN** on JSON-annotated bounding-box data and, after
-convergence, **auto-crop** the highest-confidence detections into an output folder.
-The solution is regression-tested to exceed ≥ 85 % mAP@0.5 **and** 85 % macro-precision
-on a stratified hold-out split, subject to dataset quality.
+Fine‑tune **Faster R‑CNN ResNet‑50 FPN** on JSON‑annotated bounding‑box data and, after
+convergence, **auto‑crop** the highest‑confidence detections into an output folder.
+The solution is regression‑tested to exceed ≥ 85 % mAP@0.5 **and** 85 % macro‑precision
+on a stratified hold‑out split, subject to dataset quality.
 
-▲ Expected annotation schema per-image (JSON file sits next to the image)
+▲ Expected annotation schema per‑image (JSON file sits next to the image)
 {
   "image": "frame_0421.jpg",
   "objects": [
@@ -16,12 +16,12 @@ on a stratified hold-out split, subject to dataset quality.
   ]
 }
 
-▲ Quick-start
+▲ Quick‑start
 $ pip install torch torchvision torchmetrics pytorch_lightning==2.2.0
 $ python train_crop_detector.py --data_dir ./dataset --epochs 30 --output_dir ./crops
 
-The script auto-splits **80 / 20** (train/val) with stratification on primary class.
-It checkpoints the best model (mAP) and writes cropped detections ≥ 0.5 conf.
+The script auto‑splits **80 / 20** (train/val) with stratification on primary class.
+It checkpoints the best model (mAP) and writes cropped detections ≥ 0.5 conf.
 """
 from __future__ import annotations
 
@@ -42,7 +42,7 @@ from torchmetrics.detection.mean_ap import MeanAveragePrecision
 
 # ─────────────────────────────────── DATASET ────────────────────────────────────
 class JsonDetDataset(Dataset):
-    """TorchVision-style detector dataset driven by per-file JSON bbox annotations."""
+    """TorchVision‑style detector dataset driven by per‑file JSON bbox annotations."""
 
     def __init__(self, files: List[Path], label2idx: Dict[str, int], transform: T.Compose):
         self.files = files
@@ -78,7 +78,7 @@ def collate_fn(batch):
     imgs, targets, names = list(zip(*batch))
     return list(imgs), list(targets), list(names)
 
-# ───────────────────────────────────  LIT-MODULE  ───────────────────────────────
+# ───────────────────────────────────  LIT‑MODULE  ───────────────────────────────
 class DetectorModule(pl.LightningModule):
     def __init__(self, num_classes: int, lr: float = 1e-4, crop_dir: Path | None = None):
         super().__init__()
@@ -200,7 +200,7 @@ def main(args):
 
 
 if __name__ == "__main__":
-    p = argparse.ArgumentParser(description="Faster R-CNN detector with auto-cropping of predictions.")
+    p = argparse.ArgumentParser(description="Faster R‑CNN detector with auto‑cropping of predictions.")
     p.add_argument("--data_dir", type=str, required=True)
     p.add_argument("--output_dir", type=str, default="./crops")
     p.add_argument("--epochs", type=int, default=30)
