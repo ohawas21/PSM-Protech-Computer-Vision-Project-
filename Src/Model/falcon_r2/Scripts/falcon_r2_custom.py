@@ -50,8 +50,8 @@ def convert_labelme_dataset(labelme_dir, yolo_label_dir, class_map):
 def generate_data_yaml(save_path, class_map, train_img, val_img):
     with open(save_path, "w") as f:
         f.write(f"path: {Path(train_img).parent.parent.resolve()}\n")
-        f.write(f"train: {Path(train_img).parent.name}/images\n")
-        f.write(f"val: {Path(val_img).parent.name}/images\n")
+        f.write(f"train: {Path(train_img).parent.as_posix()}\n")
+        f.write(f"val: {Path(val_img).parent.as_posix()}\n")
         f.write("names:\n")
         for id, name in class_map.items():
             f.write(f"  {id}: '{name}'\n")
