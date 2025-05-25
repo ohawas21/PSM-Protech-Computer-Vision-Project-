@@ -1,6 +1,0 @@
-names:
-- falcon_r2
-nc: 1
-path: /home/studvaikmu5453/Project_PSE/PSM-Protech-Feasibility-Study/Src/Model/falcon_r2/Scripts/crops
-train: images/train
-val: images/val
