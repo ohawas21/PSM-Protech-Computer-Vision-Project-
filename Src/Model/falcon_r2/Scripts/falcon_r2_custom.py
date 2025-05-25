@@ -37,8 +37,6 @@ def convert_labelme_to_yolo(json_path, img_size):
         try:
             class_id = int(label)
         except ValueError:
-            # If label is not an int, map it to an integer id
-            # For simplicity, use a hash-based mapping
             class_id = abs(hash(label)) % 1000  # limit class ids to 0-999
 
         yolo_lines.append(f"{class_id} {x_center:.6f} {y_center:.6f} {w:.6f} {h:.6f}")
@@ -108,7 +106,6 @@ names: ['object']
     with open(os.path.join(root_dir, 'data.yaml'), 'w') as f:
         f.write(data_yaml)
 
-    # Save an augmentation YAML file
     hyp_yaml = os.path.join(root_dir, 'hyp.yaml')
     with open(hyp_yaml, 'w') as f:
         f.write("""\
@@ -143,12 +140,12 @@ copy_paste: 0.0
 """)
 
     train_cmd = [
-        'yolo', 'task=detect', 'mode=train',
-        'model=yolov8l.pt',
+        'yolo', 'train',
+        f'model=yolov8l.pt',
         f'data={os.path.join(root_dir, "data.yaml")}',
-        'epochs=3000'
+        'epochs=3000',
+        f'hyp={hyp_yaml}'
     ]
-    train_cmd.append(f'hyp={hyp_yaml}')
 
     print("🚀 Starting YOLOv8 training...")
     try:
@@ -157,7 +154,6 @@ copy_paste: 0.0
         print("❌ Failed to launch YOLOv8 training:", e)
         return
 
-    # Find the latest training directory and best.pt path
     train_runs = glob('runs/detect/train*')
     if train_runs:
         latest_run = max(train_runs, key=os.path.getmtime)
@@ -165,7 +161,6 @@ copy_paste: 0.0
     else:
         best_model_src = None
 
-    # Copy best model to root directory and backup in models directory
     if best_model_src and os.path.exists(best_model_src):
         best_model_dst = os.path.join(root_dir, 'best.pt')
         shutil.copy2(best_model_src, best_model_dst)
@@ -176,7 +171,6 @@ copy_paste: 0.0
     else:
         print("❌ Best model not found after training.")
 
-    # After training, run prediction on validation images and save results
     try:
         from ultralytics import YOLO
         import cv2
@@ -189,42 +183,31 @@ copy_paste: 0.0
         save_dir = 'runs/test_images'
         os.makedirs(save_dir, exist_ok=True)
         print("🚀 Running prediction on validation images...")
-        # Run prediction with specified options
+
         results = model.predict(source=images_val_dir, save=True, save_dir=save_dir,
                                 save_txt=True, save_conf=True,
                                 vid_stride=1, visualize=False)
 
-        # Replace resized saved images with copies of original quality validation images
-        # and overlay predictions manually if necessary
         for result in results:
-            # result.orig_img is the original image in numpy array
-            # result.path is the path to the input image
             orig_img_path = result.path
             base_name = os.path.basename(orig_img_path)
             saved_img_path = os.path.join(save_dir, base_name)
-
-            # Copy original quality image to replace saved resized image
             shutil.copy2(orig_img_path, saved_img_path)
 
-            # Load original image to overlay predictions
             img = cv2.imread(saved_img_path)
             if img is None:
                 continue
 
-            # Overlay boxes and labels from prediction
             boxes = result.boxes
             for box in boxes:
                 xyxy = box.xyxy[0].cpu().numpy().astype(int)
                 conf = box.conf[0].item()
                 cls = int(box.cls[0].item())
                 label = f"{cls} {conf:.2f}"
-                # Draw rectangle
                 cv2.rectangle(img, (xyxy[0], xyxy[1]), (xyxy[2], xyxy[3]), (0, 255, 0), 2)
-                # Put label
                 cv2.putText(img, label, (xyxy[0], xyxy[1] - 10), cv2.FONT_HERSHEY_SIMPLEX,
                             0.5, (0, 255, 0), 2)
 
-            # Save the overlaid image
             cv2.imwrite(saved_img_path, img)
 
         print("✅ Prediction images saved to runs/test_images/")
