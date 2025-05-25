@@ -102,9 +102,25 @@ names: ['object']
 
     train_cmd = [
         'yolo', 'task=detect', 'mode=train',
-        'model=yolov8n.pt',
+        'model=yolov8l.pt',  # larger model for better performance
         f'data={os.path.join(root_dir, "data.yaml")}',
-        'epochs=3000'
+        'epochs=500',        # adjusted to avoid overfitting
+        'imgsz=640',
+        'batch=16',
+        'patience=50',
+        'optimizer=AdamW',
+        'lr0=0.001',
+        'lrf=0.01',
+        'weight_decay=0.0005',
+        'momentum=0.937',
+        'hsv_h=0.015',
+        'hsv_s=0.7',
+        'hsv_v=0.4',
+        'translate=0.1',
+        'scale=0.5',
+        'fliplr=0.5',
+        'mosaic=1.0',
+        'mixup=0.0'
     ]
     print("🚀 Starting YOLOv8 training...")
     try:
