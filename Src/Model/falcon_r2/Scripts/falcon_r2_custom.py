@@ -88,7 +88,7 @@ names: ['object']
 def train_model(data_yaml_path):
     cmd = [
         'yolo', 'task=segment', 'mode=train',
-        'model=yolov8l-seg.pt',
+        'model=yolo11l.pt',
         f'data={data_yaml_path}',
         'epochs=300',
         'imgsz=640'
