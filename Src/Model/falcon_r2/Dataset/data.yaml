@@ -3,3 +3,6 @@ val: /home/studvaikmu5453/Project_PSE/PSM-Protech-Feasibility-Study/Src/Model/fa
 
 nc: 1
 names: ['object']
+path: ../Dataset/coco_format
+train: train.json
+val: train.json
