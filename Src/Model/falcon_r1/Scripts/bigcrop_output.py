@@ -1,99 +1,102 @@
 import os
-import json
 import glob
+import json
 import cv2
 import numpy as np
 
-# === 1) Compute absolute paths based on script location ===
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+# === 1) EXPLICIT PATHS ===
+# Make sure you run this script from the project root:
+# C:\Users\alyan\PSE\PSM-Protech-Feasibility-Study
 
-INPUT_DIR = os.path.normpath(
-    os.path.join(
-        SCRIPT_DIR,
-        "..",  # up from Scripts
-        "Dataset",
-        "prean"
-    )
+# Path to your images + JSONs:
+INPUT_DIR = os.path.abspath(
+    r"PSM-Protech-Feasibility-Study\Src\Model\falcon_r1\Dataset\prean"
 )
 
-OUTPUT_DIR = os.path.normpath(
-    os.path.join(
-        SCRIPT_DIR,
-        "..",  # up from Scripts
-        "bigcrop_output"
-    )
+# Where you want your per-polygon crops saved:
+OUTPUT_DIR = os.path.abspath(
+    r"PSM-Protech-Feasibility-Study\Src\Model\falcon_r1\bigcrop_output"
 )
 
 print(f"[INFO] INPUT_DIR:  {INPUT_DIR}")
 print(f"[INFO] OUTPUT_DIR: {OUTPUT_DIR}")
-
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# === 2) Gather all images (recursively) ===
-IMG_EXTS = ("*.png", "*.jpg", "*.jpeg", "*.bmp", "*.tif", "*.tiff")
 
-def get_all_image_paths(root_dir):
-    img_paths = []
+# === 2) Find all images recursively ===
+IMG_EXTS = ("*.png", "*.jpg", "*.jpeg", "*.bmp", "*.tif", "*.tiff")
+def find_images(root):
+    imgs = []
     for ext in IMG_EXTS:
-        # glob.glob with recursive
-        img_paths.extend(glob.glob(os.path.join(root_dir, "**", ext), recursive=True))
-    return img_paths
+        imgs.extend(glob.glob(os.path.join(root, "**", ext), recursive=True))
+    return imgs
+
 
 # === 3) JSON loader ===
-def load_json(p):
-    with open(p, 'r') as f:
+def load_json(path):
+    with open(path, "r") as f:
         return json.load(f)
 
-# === 4) Drawing helper ===
-def draw_polygons_on_image(img, shapes, color=(0,255,0), thickness=2, fill=False):
-    overlay = img.copy()
-    for shape in shapes:
-        pts = np.array(shape.get("points", []), dtype=np.int32)
-        if pts.size == 0:
-            continue
-        if fill:
-            cv2.fillPoly(overlay, [pts], color)
-        else:
-            cv2.polylines(overlay, [pts], isClosed=True, color=color, thickness=thickness)
-    return overlay
+
+# === 4) Crop one polygon ===
+def crop_polygon(img, pts, apply_mask=True):
+    x, y, w, h = cv2.boundingRect(pts)
+    crop = img[y : y + h, x : x + w].copy()
+
+    if apply_mask:
+        shifted = pts - np.array([[x, y]])
+        mask = np.zeros((h, w), dtype=np.uint8)
+        cv2.fillPoly(mask, [shifted], 255)
+        b, g, r = cv2.split(crop)
+        rgba = cv2.merge([b, g, r, mask])
+        return rgba
+    return crop
+
 
 # === 5) Main ===
 def main():
-    imgs = get_all_image_paths(INPUT_DIR)
-    print(f"[INFO] Found {len(imgs)} image(s) under {INPUT_DIR!r}")
-    if not imgs:
-        print("[WARN] No images to process. Check that INPUT_DIR is correct and contains files.")
-        return
+    images = find_images(INPUT_DIR)
+    print(f"[INFO] Found {len(images)} image(s) under '{INPUT_DIR}'")
 
-    for img_path in imgs:
+    for img_path in images:
         rel = os.path.relpath(img_path, INPUT_DIR)
-        base, _ = os.path.splitext(os.path.basename(img_path))
+        base = os.path.splitext(os.path.basename(img_path))[0]
         json_path = os.path.join(os.path.dirname(img_path), base + ".json")
 
         if not os.path.exists(json_path):
-            print(f"[WARN] No JSON for {rel!r}; skipping.")
+            print(f"[WARN] No JSON for '{rel}', skipping.")
             continue
 
-        img = cv2.imread(img_path)
+        img = cv2.imread(img_path, cv2.IMREAD_UNCHANGED)
         if img is None:
-            print(f"[ERROR] Failed to load {rel!r}; skipping.")
+            print(f"[ERROR] Failed to load '{rel}', skipping.")
             continue
 
         data = load_json(json_path)
         shapes = data.get("shapes", [])
         if not shapes:
-            print(f"[WARN] JSON {base}.json has no 'shapes'; skipping.")
+            print(f"[WARN] '{base}.json' has no shapes, skipping.")
             continue
 
-        annotated = draw_polygons_on_image(img, shapes, color=(0,255,0), thickness=2, fill=False)
+        # Make per-image subfolder in OUTPUT_DIR
+        sub_out = os.path.join(OUTPUT_DIR, os.path.dirname(rel))
+        os.makedirs(sub_out, exist_ok=True)
 
-        # replicate folder structure under OUTPUT_DIR
-        out_subdir = os.path.join(OUTPUT_DIR, os.path.dirname(rel))
-        os.makedirs(out_subdir, exist_ok=True)
+        for i, shape in enumerate(shapes):
+            pts = np.array(shape["points"], dtype=np.int32)
+            if pts.size == 0:
+                continue
 
-        out_path = os.path.join(out_subdir, base + "_annotated.png")
-        cv2.imwrite(out_path, annotated)
-        print(f"[OK] {rel} → {os.path.relpath(out_path, SCRIPT_DIR)}")
+            label = shape.get("label", "shape")
+            # sanitize label
+            label = "".join(c for c in label if c.isalnum() or c in ("-", "_")).strip()
+
+            crop = crop_polygon(img, pts, apply_mask=True)
+            out_name = f"{base}_{label}_{i:02d}.png"
+            out_path = os.path.join(sub_out, out_name)
+
+            cv2.imwrite(out_path, crop)
+            print(f"[OK] {rel} → {os.path.relpath(out_path)}")
 
 if __name__ == "__main__":
     main()
