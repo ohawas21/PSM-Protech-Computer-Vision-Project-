@@ -90,9 +90,8 @@ def main():
     process_and_save(val_imgs, images_val_dir, labels_val_dir)
 
     data_yaml = f"""\
-path: {root_dir}
-train: images/train
-val: images/val
+train: {os.path.join(root_dir, 'images/train')}
+val: {os.path.join(root_dir, 'images/val')}
 
 nc: 1
 names: ['object']
