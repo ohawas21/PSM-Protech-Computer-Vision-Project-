@@ -111,6 +111,24 @@ names: ['object']
         subprocess.run(train_cmd, check=True)
     except Exception as e:
         print("❌ Failed to launch YOLOv8 training:", e)
+        return
+
+    # After training, run prediction on validation images and save results
+    try:
+        from ultralytics import YOLO
+        best_model_path = os.path.join(root_dir, 'weights', 'best.pt')
+        if not os.path.exists(best_model_path):
+            print(f"❌ Best model not found at {best_model_path}")
+            return
+        model = YOLO(best_model_path)
+        os.makedirs('runs/test_images', exist_ok=True)
+        print("🚀 Running prediction on validation images...")
+        model.predict(source=images_val_dir, save=True, save_dir='runs/test_images')
+        print("✅ Prediction images saved to runs/test_images/")
+    except ImportError:
+        print("❌ ultralytics package not found. Please install it to run predictions.")
+    except Exception as e:
+        print(f"❌ Failed to run prediction: {e}")
 
 if __name__ == "__main__":
     main()
