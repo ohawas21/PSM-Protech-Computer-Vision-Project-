@@ -1,5 +1,0 @@
-path: /home/studvaikmu5453/Project_PSE/PSM-Protech-Feasibility-Study/Src/Model/falcon_r2/Scripts/Dataset/train
-train: Dataset/train/images
-val: Dataset/val/images
-names:
-  0: 'falcon_r2'
