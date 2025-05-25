@@ -26,14 +26,14 @@ def convert_labelme_to_yolo(json_path, img_size):
         points = shape.get('points', [])
         if not points:
             continue
-        x_min, y_min, x_max, y_max = polygon_to_bbox(points)
-
-        x_center = ((x_min + x_max) / 2) / width
-        y_center = ((y_min + y_max) / 2) / height
-        w = (x_max - x_min) / width
-        h = (y_max - y_min) / height
-
-        yolo_lines.append(f"0 {x_center:.6f} {y_center:.6f} {w:.6f} {h:.6f}")
+        # Flatten the polygon and normalize
+        norm_points = []
+        for x, y in points:
+            norm_x = x / width
+            norm_y = y / height
+            norm_points.extend([f"{norm_x:.6f}", f"{norm_y:.6f}"])
+        yolo_line = f"0 " + " ".join(norm_points)
+        yolo_lines.append(yolo_line)
 
     return yolo_lines
 
@@ -101,8 +101,8 @@ names: ['object']
         f.write(data_yaml)
 
     train_cmd = [
-        'yolo', 'task=detect', 'mode=train',
-        'model=yolov8n.pt',
+        'yolo', 'task=segment', 'mode=train',
+        'model=yolov8n-seg.pt',
         f'data={os.path.join(root_dir, "data.yaml")}',
         'epochs=3000'
     ]
