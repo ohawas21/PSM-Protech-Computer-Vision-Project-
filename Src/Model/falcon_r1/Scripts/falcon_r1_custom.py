@@ -114,7 +114,7 @@ names: ['object']
         return
 
     # Find the latest training directory and best.pt path
-    train_runs = glob(os.path.join(root_dir, 'runs', 'detect', 'train*'))
+    train_runs = glob('runs/detect/train*')
     if train_runs:
         latest_run = max(train_runs, key=os.path.getmtime)
         best_model_src = os.path.join(latest_run, 'weights', 'best.pt')
@@ -135,13 +135,54 @@ names: ['object']
     # After training, run prediction on validation images and save results
     try:
         from ultralytics import YOLO
+        import cv2
+        import numpy as np
+
         if not best_model_src or not os.path.exists(best_model_src):
             print(f"❌ Best model not found at {best_model_src}")
             return
         model = YOLO(best_model_src)
-        os.makedirs('runs/test_images', exist_ok=True)
+        save_dir = 'runs/test_images'
+        os.makedirs(save_dir, exist_ok=True)
         print("🚀 Running prediction on validation images...")
-        model.predict(source=images_val_dir, save=True, save_dir='runs/test_images')
+        # Run prediction with specified options
+        results = model.predict(source=images_val_dir, save=True, save_dir=save_dir,
+                                save_txt=True, save_conf=True,
+                                vid_stride=1, visualize=False)
+
+        # Replace resized saved images with copies of original quality validation images
+        # and overlay predictions manually if necessary
+        for result in results:
+            # result.orig_img is the original image in numpy array
+            # result.path is the path to the input image
+            orig_img_path = result.path
+            base_name = os.path.basename(orig_img_path)
+            saved_img_path = os.path.join(save_dir, base_name)
+
+            # Copy original quality image to replace saved resized image
+            shutil.copy2(orig_img_path, saved_img_path)
+
+            # Load original image to overlay predictions
+            img = cv2.imread(saved_img_path)
+            if img is None:
+                continue
+
+            # Overlay boxes and labels from prediction
+            boxes = result.boxes
+            for box in boxes:
+                xyxy = box.xyxy[0].cpu().numpy().astype(int)
+                conf = box.conf[0].item()
+                cls = int(box.cls[0].item())
+                label = f"{cls} {conf:.2f}"
+                # Draw rectangle
+                cv2.rectangle(img, (xyxy[0], xyxy[1]), (xyxy[2], xyxy[3]), (0, 255, 0), 2)
+                # Put label
+                cv2.putText(img, label, (xyxy[0], xyxy[1] - 10), cv2.FONT_HERSHEY_SIMPLEX,
+                            0.5, (0, 255, 0), 2)
+
+            # Save the overlaid image
+            cv2.imwrite(saved_img_path, img)
+
         print("✅ Prediction images saved to runs/test_images/")
     except ImportError:
         print("❌ ultralytics package not found. Please install it to run predictions.")
