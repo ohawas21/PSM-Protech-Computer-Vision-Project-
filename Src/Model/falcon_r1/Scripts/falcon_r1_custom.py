@@ -104,7 +104,7 @@ names: ['object']
         'yolo', 'task=detect', 'mode=train',
         'model=yolov8n.pt',
         f'data={os.path.join(root_dir, "data.yaml")}',
-        'epochs=1000'
+        'epochs=3000'
     ]
     print("🚀 Starting YOLOv8 training...")
     try:
