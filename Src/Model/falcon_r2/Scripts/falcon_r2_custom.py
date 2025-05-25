@@ -239,7 +239,8 @@ class CustomDataset(Dataset):
         img = cv2.imread(self.image_paths[idx])
         img = cv2.resize(img, (640, 640))
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        label = 1.0 if os.path.getsize(self.label_paths[idx]) > 0 else 0.0
+        label_path = self.label_paths[idx]
+        label = 1.0 if os.path.exists(label_path) and os.path.getsize(label_path) > 0 else 0.0
         if self.transform:
             img = self.transform(img)
         return img, torch.tensor([label], dtype=torch.float32)
