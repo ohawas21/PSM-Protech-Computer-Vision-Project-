@@ -44,8 +44,9 @@ def process_dataset(root_dir):
         'labels/train': os.path.join(root_dir, 'labels/train'),
         'labels/val': os.path.join(root_dir, 'labels/val'),
     }
-    for d in dirs.values():
-        os.makedirs(d, exist_ok=True)
+    for key, path in dirs.items():
+        if not os.path.exists(path):
+            os.makedirs(path, exist_ok=True)
 
     def handle_split(split_imgs, split):
         for img_path in split_imgs:
