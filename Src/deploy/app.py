@@ -1,112 +1,134 @@
-from flask import Flask, request, render_template, send_file, jsonify, redirect, url_for, flash
 import os
+import re
 import logging
-import subprocess
-from falcon_r2 import check_all_models  # Import the model check function
+from pathlib import Path
+from io import BytesIO
+import warnings
 
-app = Flask(__name__)
-app.secret_key = 'your_secret_key'
-UPLOAD_FOLDER = 'falcon_r1_preprocess'
-OUTPUT_FOLDER = 'output'
+import cv2
+import numpy as np
+import camelot
+import pandas as pd
+from PIL import Image
+from pdf2image import convert_from_bytes
+import pytesseract
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Configuration
+IMAGE_DIR   = Path("falcon_r4")
+OUTPUT_DIR  = Path("output")
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+OUTPUT_CSV  = OUTPUT_DIR / "final_output.csv"
+MODEL_PATH_R1  = Path("PSM-Protech-Feasibility-Study/Src/deploy/models/falcon_r1.pt")
+MODEL_PATH_R2  = Path("PSM-Protech-Feasibility-Study/Src/deploy/models/falcon_r2.pt")
+MODEL_PATH_R3  = Path("PSM-Protech-Feasibility-Study/Src/deploy/models/falcon_r3.pt")
 
-# Ensure folders exist
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+# Logging setup
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    filename='progress.log',
+    filemode='a'
+)
+logger = logging.getLogger(__name__)
 
-def cleanup_folders():
-    folders_to_clean = ['falcon_r1_preprocess', 'falcon_r2_preprocess', 'falcon_r3', 'falcon_r4']
-    for folder in folders_to_clean:
-        for file_name in os.listdir(folder):
-            file_path = os.path.join(folder, file_name)
-            try:
-                if os.path.isfile(file_path):
-                    os.unlink(file_path)
-                elif os.path.isdir(file_path):
-                    os.rmdir(file_path)
-            except Exception as e:
-                logging.error(f'Error cleaning up {file_path}: {e}')
-    logging.info('Cleanup completed.')
+# Tesseract config
+TESS_CONFIG = "--psm 7 --oem 3 -c tessedit_char_whitelist=0123456789."
+warnings.filterwarnings('ignore', category=UserWarning)
 
-@app.route('/')
-def index():
-    return render_template('index.html')
+class TableOCRExtractor:
+    def __init__(self, image_dir: Path):
+        self.image_dir = image_dir
+        self.pdf_dir   = image_dir.parent / "temp_pdfs"
+        self.pdf_dir.mkdir(parents=True, exist_ok=True)
+        self.results = []
 
-@app.route('/upload', methods=['POST'])
-def upload_file():
-    if 'file' not in request.files:
-        logging.error('No file part in the request')
-        return 'No file part', 400
-    file = request.files['file']
-    if file.filename == '':
-        logging.error('No file selected for upload')
-        return 'No selected file', 400
-    file_path = os.path.join(UPLOAD_FOLDER, file.filename)
-    file.save(file_path)
-    logging.info(f'File uploaded successfully: {file_path}')
+    def convert_image_to_pdf(self, img_path: Path) -> Path:
+        buf = BytesIO()
+        Image.open(img_path).convert("RGB").save(buf, format="PDF")
+        buf.seek(0)
+        pdf_path = self.pdf_dir / f"{img_path.stem}.pdf"
+        pdf_path.write_bytes(buf.getvalue())
+        return pdf_path
 
-    try:
-        if not check_all_models():
-            flash('Some models are missing. Please check the logs for details.', 'error')
-            return redirect(url_for('index'))
+    def try_camelot(self, pdf_path: Path, name: str):
+        try:
+            tables = camelot.read_pdf(str(pdf_path), flavor="stream", pages="1")
+            if tables:
+                df = tables[0].df
+                c2 = df.iloc[0,1].strip()
+                c3 = df.iloc[0,2].strip()
+                logger.info("  ✔ Camelot parsed %s → %s, %s", name, c2, c3)
+                return c2, c3
+        except Exception as e:
+            logger.warning("  Camelot error on %s: %s", name, e)
+        return None
 
-        logging.info('Starting falcon_r1 preprocessing...')
-        subprocess.run(['python3', 'falcon_r1.py'], check=True)
+    def render_pdf_to_image(self, pdf_path: Path) -> Image.Image | None:
+        try:
+            pages = convert_from_bytes(pdf_path.read_bytes(), dpi=300)
+            return pages[0] if pages else None
+        except Exception as e:
+            logger.error("  PDF rendering error for %s: %s", pdf_path.name, e)
+            return None
 
-        logging.info('Starting falcon_r2 processing...')
-        subprocess.run(['python3', 'falcon_r2.py'], check=True)
+    def crop_columns(self, img: Image.Image) -> tuple[Image.Image, Image.Image]:
+        W, H = img.size
+        x1 = int(W * 0.20)
+        x2 = int(W * 0.60)
+        x3 = int(W * 0.98)
+        col2_img = img.crop((x1, 0, x2, H))
+        col3_img = img.crop((x2, 0, x3, H))
+        return col2_img, col3_img
 
-        logging.info('Starting falcon_r3 classification...')
-        subprocess.run(['python3', 'falcon_r3.py'], check=True)
+    def preprocess(self, region: Image.Image) -> Image.Image:
+        arr = cv2.cvtColor(np.array(region), cv2.COLOR_RGB2GRAY)
+        blur = cv2.GaussianBlur(arr, (3,3), 0)
+        _, th = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        inv = cv2.bitwise_not(th)
+        up = cv2.resize(inv, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
+        return Image.fromarray(up)
 
-        logging.info('Starting falcon_r4 data extraction...')
-        subprocess.run(['python3', 'falcon_r4.py'], check=True)
+    def ocr_region(self, region: Image.Image, name: str, label: str) -> str | None:
+        prep = self.preprocess(region)
+        txt = pytesseract.image_to_string(prep, config=TESS_CONFIG).strip()
+        snippet = txt.replace("\n", " ")[:40]
+        logger.info("    OCR[%s] snippet: '%s...';", label, snippet)
+        m = re.search(r"\d+\.\d+", txt)
+        if m:
+            val = m.group(0)
+            logger.info("    → %s = %s", label, val)
+            return val
+        logger.warning("    ⚠️ %s region %s: no decimal found", name, label)
+        return None
 
-        logging.info('Starting cleanup of intermediate folders...')
-        cleanup_folders()
+    def run(self):
+        logger.info("+++ Starting hybrid Camelot+OCR pipeline +++")
+        imgs = sorted(self.image_dir.glob("*.*"))
+        imgs = [p for p in imgs if p.suffix.lower() in {'.png','.jpg','.jpeg','.tif','.tiff'}]
+        logger.info(f"Processing {len(imgs)} images...")
 
-        flash('File uploaded and processed successfully!', 'success')
-    except Exception as e:
-        flash(f"An unexpected error occurred: {str(e)}", 'error')
-        logging.error(f'Unexpected error: {e}')
+        for img_path in imgs:
+            name = img_path.stem
+            logger.info(f"Processing '{name}'")
 
-    return redirect(url_for('index'))
+            pdf = self.convert_image_to_pdf(img_path)
+            res = self.try_camelot(pdf, name)
+            if not res:
+                page_img = self.render_pdf_to_image(pdf)
+                if page_img:
+                    col2_img, col3_img = self.crop_columns(page_img)
+                    v2 = self.ocr_region(col2_img, name, 'col2')
+                    v3 = self.ocr_region(col3_img, name, 'col3')
+                    if v2 and v3:
+                        res = (v2, v3)
 
-@app.route('/download', methods=['GET'])
-def download_file():
-    excel_file = os.path.join(OUTPUT_FOLDER, 'final_output.xlsx')
-    if not os.path.exists(excel_file):
-        logging.error('No file available for download')
-        return 'No file available for download', 404
-    logging.info(f'File downloaded: {excel_file}')
-    return send_file(excel_file, as_attachment=True)
+            if res:
+                c2, c3 = res
+                self.results.append({'source_image': name, 'col2': c2, 'col3': c3})
 
-@app.route('/progress', methods=['GET'])
-def get_progress():
-    if not os.path.exists('progress.log'):
-        return jsonify({'progress': 'No progress log found.'})
-    with open('progress.log', 'r') as log_file:
-        logs = log_file.readlines()
-    return jsonify({'progress': logs[-10:]})
+        df = pd.DataFrame(self.results)
+        df.to_csv(OUTPUT_CSV, index=False)
+        logger.info("✅ Saved %d rows to %s", len(df), OUTPUT_CSV)
 
-@app.route('/check_models', methods=['GET'])
-def check_models():
-    required_models = [
-        'models/falcon_r1.pt',
-        'models/falcon_r2.pt',
-        'models/falcon_r3.pt'
-    ]
-    missing_models = [model for model in required_models if not os.path.exists(model)]
-
-    if missing_models:
-        return jsonify({
-            'status': 'error',
-            'message': f"Missing models: {', '.join(missing_models)}"
-        })
-
-    return jsonify({'status': 'success'})
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+if __name__ == "__main__":
+    TableOCRExtractor(IMAGE_DIR).run()
