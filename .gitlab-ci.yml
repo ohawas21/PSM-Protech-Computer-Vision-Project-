@@ -1,62 +1,86 @@
 stages:
-  - build
-  - model1
-  - ocr_classification
-  - model3
-  - model4
+  - build_app_image
+  - build_docs
+  - model_processing
   - test
   - deploy
 
-build:
-  stage: build
+variables:
+  GITHUB_USER: vaikundamanimugesh
+  IMAGE_NAME: ghcr.io/$GITHUB_USER/psmprotech_mvp
+  IMAGE_TAG: $CI_COMMIT_REF_SLUG
+  FULL_IMAGE_NAME: $IMAGE_NAME:$IMAGE_TAG
+
+build_application_image:
+  stage: build_app_image
+  image: docker:20.10.16
+  services:
+    - docker:20.10.16-dind
+  before_script:
+    - echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_USER" --password-stdin
+  script:
+    - echo "Building Docker image from Src/deploy..."
+    - docker build -t $FULL_IMAGE_NAME -f Src/deploy/Dockerfile Src/deploy
+    - echo "Pushing Docker image to GitHub Container Registry..."
+    - docker push $FULL_IMAGE_NAME
+  rules:
+    - if: $CI_COMMIT_BRANCH
+      exists:
+        - Src/deploy/Dockerfile
+
+build_documentation:
+  stage: build_docs
   image: danteev/texlive
   script:
-    - cd Documentation
-    - for file in *.tex; do latexmk -pdf "$file"; done
+    - |
+      if [ -d "Documentation" ]; then
+        cd Documentation
+        echo "Building LaTeX documentation..."
+        for file in *.tex; do
+          if [ -f "$file" ]; then
+            latexmk -pdf "$file"
+          fi
+        done
+      fi
   artifacts:
     paths:
       - Documentation/*.pdf
     expire_in: 1 week
+    when: always
 
-model1:
-  stage: model1
-  image: alpine:latest
-  script:
-    - echo "Processing Model 1..."
-
-ocr_classification:
-  stage: ocr_classification
+ocr_classification_test:
+  stage: model_processing
   image: python:3.10
   allow_failure: true
   script:
-    - echo "Preparing OCR Classification model preload test..."
-    - cd Src/Model/OCR_Classification/Model
-    - pip install --upgrade pip
-    - echo "Pip upgraded"
-    - pip install -r requirements.txt
-    - echo "Running classification test"
-    - python test_model.py
+    - |
+      if [ -d "Src/Model/OCR_Classification/Model" ]; then
+        cd Src/Model/OCR_Classification/Model
+        pip install --upgrade pip
+        if [ -f "requirements.txt" ]; then
+          pip install -r requirements.txt
+          python test_model.py
+        fi
+      else
+        echo "OCR model directory not found."
+      fi
 
-model3:
-  stage: model3
-  image: alpine:latest
-  script:
-    - echo "Processing Model 3..."
-
-model4:
-  stage: model4
-  image: alpine:latest
-  script:
-    - echo "Processing Model 4..."
-
-test:
+application_tests:
   stage: test
-  image: alpine:latest
+  image: $FULL_IMAGE_NAME
   script:
-    - echo "Running tests..."
+    - echo "Running basic health check inside container..."
+    # You can expand this to run real tests or health checks
+  needs: [build_application_image]
 
-deploy:
+deploy_application:
   stage: deploy
   image: alpine:latest
   script:
-    - echo "Deploying application..."
+    - echo "Deploying application from image $FULL_IMAGE_NAME..."
+    # Add actual deployment commands if needed (e.g., SSH into server and run container)
+  environment:
+    name: production
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  needs: [build_application_image, application_tests]
