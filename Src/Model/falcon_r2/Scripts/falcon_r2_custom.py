@@ -1,180 +1,193 @@
-import os, json, argparse, torch, torch.nn as nn
-import numpy as np, cv2
+import os
+import json
+import argparse
+import shutil
+import subprocess
+import random
+import sys
 from glob import glob
-from tqdm import tqdm
-from PIL import Image, ImageDraw
-from torch.utils.data import Dataset, DataLoader
-import albumentations as A
-from albumentations.pytorch import ToTensorV2
-from torchvision.models import resnet50
-from torch.cuda.amp import autocast, GradScaler
+from PIL import Image
 
-IMG_WIDTH, IMG_HEIGHT = 1920, 1080  # ↓ Reduced from 4K
+def polygon_to_bbox(points):
+    xs = [p[0] for p in points]
+    ys = [p[1] for p in points]
+    x_min, x_max = min(xs), max(xs)
+    y_min, y_max = min(ys), max(ys)
+    return x_min, y_min, x_max, y_max
 
-def count_parameters(model):
-    total = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(f"📦 Total trainable parameters: {total:,}")
+def convert_labelme_to_yolo(json_path, img_size):
+    with open(json_path, 'r') as f:
+        data = json.load(f)
 
-class PolygonToBoxDataset(Dataset):
-    def __init__(self, img_dir=None, lbl_dir=None, paired_files=None):
-        if paired_files:
-            self.img_paths = [p[0] for p in paired_files]
-            self.lbl_paths = [p[1] for p in paired_files]
-        else:
-            self.img_paths = sorted(glob(os.path.join(img_dir, '*.jpg')) + glob(os.path.join(img_dir, '*.png')))
-            self.lbl_paths = sorted(glob(os.path.join(lbl_dir, '*.json'))) if lbl_dir else []
+    width, height = img_size
+    yolo_lines = []
 
-        self.aug = A.Compose([
-            A.HorizontalFlip(p=0.5), A.VerticalFlip(p=0.5),
-            A.RandomBrightnessContrast(p=0.3), A.Rotate(limit=30, p=0.5),
-            A.Resize(IMG_HEIGHT, IMG_WIDTH), ToTensorV2()
-        ])
+    for shape in data.get('shapes', []):
+        points = shape.get('points', [])
+        if not points:
+            continue
+        x_min, y_min, x_max, y_max = polygon_to_bbox(points)
 
-    def __len__(self): return len(self.img_paths)
+        x_center = ((x_min + x_max) / 2) / width
+        y_center = ((y_min + y_max) / 2) / height
+        w = (x_max - x_min) / width
+        h = (y_max - y_min) / height
 
-    def __getitem__(self, idx):
-        img_path, lbl_path = self.img_paths[idx], self.lbl_paths[idx] if self.lbl_paths else None
-        img = Image.open(img_path).convert("RGB")
-        w, h = img.size
-        img_np = np.array(img)
+        yolo_lines.append(f"0 {x_center:.6f} {y_center:.6f} {w:.6f} {h:.6f}")
 
-        boxes = []
-        if lbl_path:
-            with open(lbl_path, 'r') as f:
-                data = json.load(f)
-            for shape in data['shapes']:
-                pts = np.array(shape['points'])
-                x_min, y_min = np.min(pts, axis=0)
-                x_max, y_max = np.max(pts, axis=0)
-                boxes.append([x_min, y_min, x_max, y_max])
-
-        box = torch.tensor([0, 0, 1, 1], dtype=torch.float32) if not boxes else \
-              torch.tensor(max(boxes, key=lambda b: (b[2]-b[0])*(b[3]-b[1])), dtype=torch.float32)
-
-        img_resized = cv2.resize(img_np, (IMG_WIDTH, IMG_HEIGHT))
-        box[0::2] *= IMG_WIDTH / w
-        box[1::2] *= IMG_HEIGHT / h
-
-        return self.aug(image=img_resized)['image'], box
-
-class StrongDetector(nn.Module):
-    def __init__(self):
-        super().__init__()
-        backbone = resnet50(weights='DEFAULT')
-        for param in backbone.parameters(): param.requires_grad = False
-        self.feature_extractor = nn.Sequential(*list(backbone.children())[:-2])
-        self.pool = nn.AdaptiveAvgPool2d((1, 1))
-        self.regressor = nn.Sequential(
-            nn.Flatten(), nn.Linear(2048, 512), nn.ReLU(),
-            nn.Dropout(0.3), nn.Linear(512, 256), nn.ReLU(), nn.Linear(256, 4)
-        )
-    def forward(self, x):
-        x = self.feature_extractor(x)
-        x = self.pool(x)
-        return self.regressor(x)
-
-def box_iou(box1, box2):
-    xA, yA = max(box1[0], box2[0]), max(box1[1], box2[1])
-    xB, yB = min(box1[2], box2[2]), min(box1[3], box2[3])
-    inter = max(0, xB - xA) * max(0, yB - yA)
-    area1 = (box1[2]-box1[0]) * (box1[3]-box1[1])
-    area2 = (box2[2]-box2[0]) * (box2[3]-box2[1])
-    union = area1 + area2 - inter
-    return inter / union if union > 0 else 0.0
-
-def evaluate_metrics(model, loader, device, iou_threshold=0.5):
-    model.eval()
-    TP = FP = FN = 0
-    with torch.no_grad():
-        for imgs, boxes in loader:
-            imgs = imgs.to(device).float() / 255.0
-            with autocast():
-                preds = model(imgs).cpu().numpy()
-            gts = boxes.numpy()
-            for p, g in zip(preds, gts):
-                iou = box_iou(p, g)
-                if iou >= iou_threshold: TP += 1
-                else: FP += 1; FN += 1
-    p = TP / (TP + FP + 1e-6); r = TP / (TP + FN + 1e-6); f1 = 2*p*r / (p+r+1e-6)
-    print(f"📊 Precision: {p:.3f}, Recall: {r:.3f}, F1: {f1:.3f}")
-
-def train(model, loader, device, optimizer, criterion, scaler):
-    model.train(); total_loss = 0
-    for imgs, boxes in tqdm(loader, desc="Training"):
-        imgs, boxes = imgs.to(device).float() / 255.0, boxes.to(device)
-        optimizer.zero_grad()
-        with autocast():
-            preds = model(imgs)
-            loss = criterion(preds, boxes)
-        scaler.scale(loss).backward()
-        scaler.step(optimizer)
-        scaler.update()
-        total_loss += loss.item()
-    print(f"📉 Avg Loss: {total_loss / len(loader):.4f}")
-
-def save_predictions(model, loader, device, save_dir="runs/test_images", max_samples=10):
-    os.makedirs(save_dir, exist_ok=True)
-    model.eval(); count = 0
-    with torch.no_grad():
-        for imgs, boxes in loader:
-            imgs = imgs.to(device).float() / 255.0
-            with autocast(): preds = model(imgs).cpu().numpy()
-            imgs_np = imgs.cpu().numpy().transpose(0, 2, 3, 1) * 255.0
-            boxes = boxes.cpu().numpy()
-            for i in range(len(preds)):
-                img_path = loader.dataset.img_paths[count]
-                orig_img = Image.open(img_path).convert("RGB")
-                dpi = orig_img.info.get('dpi', (72, 72))
-                draw = ImageDraw.Draw(orig_img)
-                draw.rectangle(preds[i].tolist(), outline="green", width=4)
-                draw.rectangle(boxes[i].tolist(), outline="red", width=3)
-                orig_img.save(os.path.join(save_dir, f"pred_{count}.png"), dpi=dpi)
-                count += 1
-                if count >= max_samples: return
+    return yolo_lines
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--root', required=True)
-    parser.add_argument('--epochs', type=int, default=100)
-    parser.add_argument('--batch', type=int, default=1)
-    parser.add_argument('--lr', type=float, default=1e-4)
-    parser.add_argument('--device', default='0')
-    parser.add_argument('--exp', default='cnn_halfres')
-    parser.add_argument('--doot', action='store_true')
-    args = parser.parse_args()
+    parser = argparse.ArgumentParser(description='Convert LabelMe annotations and train YOLOv8.')
+    parser.add_argument('--root', type=str, default=os.getcwd(), help='Root directory with images and annotations')
+    args = parser.parse_args(sys.argv[1:])
 
-    device = torch.device(f"cuda:{args.device}" if torch.cuda.is_available() and args.device != 'cpu' else 'cpu')
-    model = StrongDetector().to(device); count_parameters(model)
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-    criterion = nn.SmoothL1Loss()
-    scaler = GradScaler()
+    root_dir = args.root
+    img_exts = ['.jpg', '.png', '.jpeg']
+    image_files = []
+    for ext in img_exts:
+        image_files.extend(glob(os.path.join(root_dir, f'*{ext}')))
+    image_files = sorted(image_files)
 
-    def get_loader(split):
-        if args.doot:
-            img_paths = sorted(glob(os.path.join(args.root, '*.jpg')) + glob(os.path.join(args.root, '*.png')))
-            pairs = [(p, os.path.splitext(p)[0] + '.json') for p in img_paths]
-            split_idx = int(0.9 * len(pairs))
-            subset = pairs[:split_idx] if split == 'train' else pairs[split_idx:]
-            return DataLoader(PolygonToBoxDataset(paired_files=subset), batch_size=args.batch, shuffle=(split == 'train'))
-        else:
-            return DataLoader(
-                PolygonToBoxDataset(
-                    os.path.join(args.root, split, 'images'),
-                    os.path.join(args.root, split, 'labels')),
-                batch_size=args.batch, shuffle=(split == 'train'))
+    random.seed(42)
+    random.shuffle(image_files)
+    n_total = len(image_files)
+    n_train = int(0.8 * n_total)
+    train_imgs = image_files[:n_train]
+    val_imgs = image_files[n_train:]
 
-    train_loader = get_loader('train')
-    val_loader = get_loader('val') if args.doot else get_loader('test')
+    images_train_dir = os.path.join(root_dir, 'images', 'train')
+    images_val_dir = os.path.join(root_dir, 'images', 'val')
+    labels_train_dir = os.path.join(root_dir, 'labels', 'train')
+    labels_val_dir = os.path.join(root_dir, 'labels', 'val')
+    for d in [images_train_dir, images_val_dir, labels_train_dir, labels_val_dir]:
+        os.makedirs(d, exist_ok=True)
 
-    for epoch in range(args.epochs):
-        print(f"\n📅 Epoch {epoch + 1}/{args.epochs}")
-        train(model, train_loader, device, optimizer, criterion, scaler)
-        evaluate_metrics(model, val_loader, device)
+    def process_and_save(img_paths, images_dir, labels_dir):
+        for img_path in img_paths:
+            base_name = os.path.splitext(os.path.basename(img_path))[0]
+            json_path = os.path.join(root_dir, base_name + '.json')
+            if not os.path.exists(json_path):
+                continue
+            try:
+                with Image.open(img_path) as img:
+                    width, height = img.size
+                yolo_lines = convert_labelme_to_yolo(json_path, (width, height))
+            except Exception as e:
+                print(f"❌ Failed to process {img_path}: {e}")
+                continue
 
-    os.makedirs(f"runs/train/{args.exp}", exist_ok=True)
-    torch.save(model.state_dict(), f"runs/train/{args.exp}/best.pt")
-    print(f"✅ Saved to runs/train/{args.exp}/best.pt")
-    save_predictions(model, val_loader, device)
+            shutil.copy2(img_path, os.path.join(images_dir, os.path.basename(img_path)))
+
+            label_path = os.path.join(labels_dir, base_name + '.txt')
+            if yolo_lines:
+                with open(label_path, 'w') as f:
+                    f.write('\n'.join(yolo_lines))
+            else:
+                open(label_path, 'w').close()
+
+    process_and_save(train_imgs, images_train_dir, labels_train_dir)
+    process_and_save(val_imgs, images_val_dir, labels_val_dir)
+
+    data_yaml = f"""\
+path: {root_dir}
+train: images/train
+val: images/val
+
+nc: 1
+names: ['object']
+"""
+    with open(os.path.join(root_dir, 'data.yaml'), 'w') as f:
+        f.write(data_yaml)
+
+    train_cmd = [
+        'yolo', 'task=detect', 'mode=train',
+        'model=yolov8n.pt',
+        f'data={os.path.join(root_dir, "data.yaml")}',
+        'epochs=3000'
+    ]
+    print("🚀 Starting YOLOv8 training...")
+    try:
+        subprocess.run(train_cmd, check=True)
+    except Exception as e:
+        print("❌ Failed to launch YOLOv8 training:", e)
+        return
+
+    # Find the latest training directory and best.pt path
+    train_runs = glob('runs/detect/train*')
+    if train_runs:
+        latest_run = max(train_runs, key=os.path.getmtime)
+        best_model_src = os.path.join(latest_run, 'weights', 'best.pt')
+    else:
+        best_model_src = None
+
+    # Copy best model to root directory and backup in models directory
+    if best_model_src and os.path.exists(best_model_src):
+        best_model_dst = os.path.join(root_dir, 'best.pt')
+        shutil.copy2(best_model_src, best_model_dst)
+        models_dir = os.path.join(root_dir, 'models')
+        os.makedirs(models_dir, exist_ok=True)
+        backup_model_dst = os.path.join(models_dir, 'best.pt')
+        shutil.copy2(best_model_src, backup_model_dst)
+    else:
+        print("❌ Best model not found after training.")
+
+    # After training, run prediction on validation images and save results
+    try:
+        from ultralytics import YOLO
+        import cv2
+        import numpy as np
+
+        if not best_model_src or not os.path.exists(best_model_src):
+            print(f"❌ Best model not found at {best_model_src}")
+            return
+        model = YOLO(best_model_src)
+        save_dir = 'runs/test_images'
+        os.makedirs(save_dir, exist_ok=True)
+        print("🚀 Running prediction on validation images...")
+        # Run prediction with specified options
+        results = model.predict(source=images_val_dir, save=True, save_dir=save_dir,
+                                save_txt=True, save_conf=True,
+                                vid_stride=1, visualize=False)
+
+        # Replace resized saved images with copies of original quality validation images
+        # and overlay predictions manually if necessary
+        for result in results:
+            # result.orig_img is the original image in numpy array
+            # result.path is the path to the input image
+            orig_img_path = result.path
+            base_name = os.path.basename(orig_img_path)
+            saved_img_path = os.path.join(save_dir, base_name)
+
+            # Copy original quality image to replace saved resized image
+            shutil.copy2(orig_img_path, saved_img_path)
+
+            # Load original image to overlay predictions
+            img = cv2.imread(saved_img_path)
+            if img is None:
+                continue
+
+            # Overlay boxes and labels from prediction
+            boxes = result.boxes
+            for box in boxes:
+                xyxy = box.xyxy[0].cpu().numpy().astype(int)
+                conf = box.conf[0].item()
+                cls = int(box.cls[0].item())
+                label = f"{cls} {conf:.2f}"
+                # Draw rectangle
+                cv2.rectangle(img, (xyxy[0], xyxy[1]), (xyxy[2], xyxy[3]), (0, 255, 0), 2)
+                # Put label
+                cv2.putText(img, label, (xyxy[0], xyxy[1] - 10), cv2.FONT_HERSHEY_SIMPLEX,
+                            0.5, (0, 255, 0), 2)
+
+            # Save the overlaid image
+            cv2.imwrite(saved_img_path, img)
+
+        print("✅ Prediction images saved to runs/test_images/")
+    except ImportError:
+        print("❌ ultralytics package not found. Please install it to run predictions.")
+    except Exception as e:
+        print(f"❌ Failed to run prediction: {e}")
 
 if __name__ == "__main__":
     main()
