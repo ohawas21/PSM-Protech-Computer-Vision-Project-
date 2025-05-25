@@ -33,7 +33,15 @@ def convert_labelme_to_yolo(json_path, img_size):
         w = (x_max - x_min) / width
         h = (y_max - y_min) / height
 
-        yolo_lines.append(f"0 {x_center:.6f} {y_center:.6f} {w:.6f} {h:.6f}")
+        label = shape.get('label', '0')
+        try:
+            class_id = int(label)
+        except ValueError:
+            # If label is not an int, map it to an integer id
+            # For simplicity, use a hash-based mapping
+            class_id = abs(hash(label)) % 1000  # limit class ids to 0-999
+
+        yolo_lines.append(f"{class_id} {x_center:.6f} {y_center:.6f} {w:.6f} {h:.6f}")
 
     return yolo_lines
 
@@ -100,12 +108,48 @@ names: ['object']
     with open(os.path.join(root_dir, 'data.yaml'), 'w') as f:
         f.write(data_yaml)
 
+    # Save an augmentation YAML file
+    hyp_yaml = os.path.join(root_dir, 'hyp.yaml')
+    with open(hyp_yaml, 'w') as f:
+        f.write("""\
+lr0: 0.01
+lrf: 0.01
+momentum: 0.937
+weight_decay: 0.0005
+warmup_epochs: 3.0
+warmup_momentum: 0.8
+warmup_bias_lr: 0.1
+box: 0.05
+cls: 0.5
+cls_pw: 1.0
+obj: 1.0
+obj_pw: 1.0
+iou_t: 0.2
+anchor_t: 4.0
+fl_gamma: 0.0
+hsv_h: 0.015
+hsv_s: 0.7
+hsv_v: 0.4
+degrees: 0.0
+translate: 0.1
+scale: 0.5
+shear: 0.1
+perspective: 0.0
+flipud: 0.0
+fliplr: 0.5
+mosaic: 1.0
+mixup: 0.2
+copy_paste: 0.0
+""")
+
     train_cmd = [
         'yolo', 'task=detect', 'mode=train',
         'model=yolov8l.pt',
         f'data={os.path.join(root_dir, "data.yaml")}',
         'epochs=3000'
     ]
+    train_cmd.append(f'hyp={hyp_yaml}')
+
     print("🚀 Starting YOLOv8 training...")
     try:
         subprocess.run(train_cmd, check=True)
