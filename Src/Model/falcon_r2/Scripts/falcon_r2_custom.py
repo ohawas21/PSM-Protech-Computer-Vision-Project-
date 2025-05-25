@@ -106,7 +106,7 @@ names: ['object']
     with open(os.path.join(root_dir, 'data.yaml'), 'w') as f:
         f.write(data_yaml)
 
-    hyp_yaml = os.path.join(root_dir, 'hyp.yaml')
+    hyp_yaml = os.path.join(root_dir, 'cfg.yaml')
     with open(hyp_yaml, 'w') as f:
         f.write("""\
 lr0: 0.01
@@ -140,11 +140,13 @@ copy_paste: 0.0
 """)
 
     train_cmd = [
-        'yolo', 'train',
+        'yolo',
+        'detect',  # explicitly specify task
+        'train',
         f'model=yolov8l.pt',
         f'data={os.path.join(root_dir, "data.yaml")}',
         'epochs=3000',
-        f'hyp={hyp_yaml}'
+        f'cfg={hyp_yaml}'
     ]
 
     print("🚀 Starting YOLOv8 training...")
