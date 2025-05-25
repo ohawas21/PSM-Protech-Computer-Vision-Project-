@@ -89,6 +89,9 @@ def main():
     process_and_save(train_imgs, images_train_dir, labels_train_dir)
     process_and_save(val_imgs, images_val_dir, labels_val_dir)
 
+    # Train a custom CNN model on the processed dataset
+    train_custom_cnn(train_imgs, val_imgs, labels_train_dir, labels_val_dir)
+
     data_yaml = f"""\
 path: {root_dir}
 train: images/train
@@ -188,6 +191,94 @@ names: ['object']
         print("❌ ultralytics package not found. Please install it to run predictions.")
     except Exception as e:
         print(f"❌ Failed to run prediction: {e}")
+
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import DataLoader, Dataset
+from torchvision import transforms
+import cv2
+
+class CustomCNN(nn.Module):
+    def __init__(self, num_classes=1):
+        super(CustomCNN, self).__init__()
+        self.features = nn.Sequential(
+            nn.Conv2d(3, 16, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2)
+        )
+        self.classifier = nn.Sequential(
+            nn.Linear(64 * 80 * 80, 128),  # assuming 640x640 input
+            nn.ReLU(),
+            nn.Linear(128, num_classes),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        x = self.features(x)
+        x = x.view(x.size(0), -1)
+        x = self.classifier(x)
+        return x
+
+class CustomDataset(Dataset):
+    def __init__(self, image_paths, label_paths, transform=None):
+        self.image_paths = image_paths
+        self.label_paths = label_paths
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.image_paths)
+
+    def __getitem__(self, idx):
+        img = cv2.imread(self.image_paths[idx])
+        img = cv2.resize(img, (640, 640))
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        label = 1.0 if os.path.getsize(self.label_paths[idx]) > 0 else 0.0
+        if self.transform:
+            img = self.transform(img)
+        return img, torch.tensor([label], dtype=torch.float32)
+
+def train_custom_cnn(train_imgs, val_imgs, labels_train_dir, labels_val_dir):
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+    ])
+    train_dataset = CustomDataset(train_imgs, [os.path.join(labels_train_dir, os.path.splitext(os.path.basename(p))[0] + '.txt') for p in train_imgs], transform)
+    val_dataset = CustomDataset(val_imgs, [os.path.join(labels_val_dir, os.path.splitext(os.path.basename(p))[0] + '.txt') for p in val_imgs], transform)
+
+    train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=8, shuffle=False)
+
+    model = CustomCNN()
+    criterion = nn.BCELoss()
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
+
+    for epoch in range(10):
+        model.train()
+        train_loss = 0.0
+        for inputs, targets in train_loader:
+            optimizer.zero_grad()
+            outputs = model(inputs)
+            loss = criterion(outputs, targets)
+            loss.backward()
+            optimizer.step()
+            train_loss += loss.item()
+        print(f"Epoch {epoch+1}, Train Loss: {train_loss:.4f}")
+
+        model.eval()
+        val_loss = 0.0
+        with torch.no_grad():
+            for inputs, targets in val_loader:
+                outputs = model(inputs)
+                loss = criterion(outputs, targets)
+                val_loss += loss.item()
+        print(f"Epoch {epoch+1}, Val Loss: {val_loss:.4f}")
+
 
 if __name__ == "__main__":
     main()
