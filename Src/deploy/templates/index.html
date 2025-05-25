@@ -34,29 +34,38 @@
 </head>
 <body>
     <div class="container">
-        <div class="upload-container">
-            <h2 class="text-center mb-4">Document Processing Pipeline</h2>
-            <form id="uploadForm">
-                <div class="mb-3">
-                    <label for="file" class="form-label">Select Image or PDF</label>
-                    <input type="file" class="form-control" id="file" name="file" accept="image/*,.pdf" required>
+        <div id="passwordPromptContainer" class="upload-container" style="max-width: 400px;">
+            <h3 class="text-center mb-3">Enter Password</h3>
+            <input type="password" id="passwordInput" class="form-control mb-2" placeholder="Password">
+            <button id="passwordSubmitButton" class="btn btn-primary w-100">Submit</button>
+            <p id="passwordError" class="text-danger text-center mt-2" style="display: none;">Incorrect password.</p>
+        </div>
+
+        <div id="mainContent" style="display: none;">
+            <div class="upload-container">
+                <h2 class="text-center mb-4">Document Processing Pipeline</h2>
+                <form id="uploadForm">
+                    <div class="mb-3">
+                        <label for="file" class="form-label">Select Image or PDF</label>
+                        <input type="file" class="form-control" id="file" name="file" accept="image/*,.pdf" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Upload and Process</button>
+                </form>
+                
+                <div class="progress">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
                 </div>
-                <button type="submit" class="btn btn-primary w-100">Upload and Process</button>
-            </form>
-            
-            <div class="progress">
-                <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
-            </div>
-            
-            <div class="stage-indicator"></div>
-            <div id="detailedStatus"></div>
-            <div id="status" class="alert" role="alert"></div>
-            <div id="downloadContainer" style="margin-top: 20px; display: none;">
-                <a href="#" id="downloadLink" class="btn btn-success w-100">Download Last Report</a>
-                <button id="deleteReportButton" class="btn btn-danger w-100 mt-2" style="display: none;">Delete Last Report</button>
-            </div>
-            <div style="margin-top: 30px; text-align: center;">
-                <a href="{{ url_for('reports_page') }}" class="btn btn-info">View All Reports</a>
+                
+                <div class="stage-indicator"></div>
+                <div id="detailedStatus"></div>
+                <div id="status" class="alert" role="alert"></div>
+                <div id="downloadContainer" style="margin-top: 20px; display: none;">
+                    <a href="#" id="downloadLink" class="btn btn-success w-100">Download Last Report</a>
+                    <button id="deleteReportButton" class="btn btn-danger w-100 mt-2" style="display: none;">Delete Last Report</button>
+                </div>
+                <div style="margin-top: 30px; text-align: center;">
+                    <a href="{{ url_for('reports_page') }}" class="btn btn-info">View All Reports</a>
+                </div>
             </div>
         </div>
     </div>
@@ -205,6 +214,32 @@
                 statusDiv.textContent = 'Error: ' + error.message;
                 statusDiv.className = 'alert alert-danger';
                 statusDiv.style.display = 'block';
+            }
+        });
+
+        // Password Protection Logic
+        document.getElementById('passwordSubmitButton').addEventListener('click', () => {
+            const passwordInput = document.getElementById('passwordInput');
+            const passwordError = document.getElementById('passwordError');
+            const mainContent = document.getElementById('mainContent');
+            const passwordPromptContainer = document.getElementById('passwordPromptContainer');
+
+            if (passwordInput.value === 'pixmind') {
+                passwordPromptContainer.style.display = 'none';
+                mainContent.style.display = 'block';
+                passwordError.style.display = 'none';
+            } else {
+                passwordError.style.display = 'block';
+                passwordInput.focus();
+                passwordInput.select();
+            }
+        });
+
+        // Optional: Allow submitting password with Enter key
+        document.getElementById('passwordInput').addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault(); // Prevent default form submission if it were in a form
+                document.getElementById('passwordSubmitButton').click();
             }
         });
     </script>
