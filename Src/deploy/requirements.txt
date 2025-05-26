@@ -11,3 +11,8 @@ openpyxl
 pdf2image
 python-magic
 pytesseract
+gunicorn
+python-dotenv
+requests
+scikit-image
+matplotlib
