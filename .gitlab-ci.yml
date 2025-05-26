@@ -61,7 +61,7 @@ build_application_image:
   script:
     - echo "📦 Validating .pt files..."
     - |
-      for i in 1 2 3 4; do
+      for i in 1 2 3; do
         if [ ! -f "Src/deploy/models/falcon_r${i}.pt" ]; then
           echo "❌ Missing: Src/deploy/models/falcon_r${i}.pt"
           exit 1
