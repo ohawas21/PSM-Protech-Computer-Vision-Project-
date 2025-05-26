@@ -10,7 +10,7 @@ stages:
 variables:
   GITHUB_USER: vaikundamanimugesh
   IMAGE_NAME: ghcr.io/$GITHUB_USER/psmprotech_mvp
-  IMAGE_TAG: $CI_COMMIT_REF_SLUG
+  IMAGE_TAG: main                        # ← force all images to use “:main”
   FULL_IMAGE_NAME: $IMAGE_NAME:$IMAGE_TAG
 
 # -------------------------------------------
@@ -26,38 +26,26 @@ check_git_access:
     - git rev-parse --abbrev-ref HEAD
 
 # -------------------------------------------
-# STAGE 2: MODEL FOLDER CHECKS (SUB-TASKS)
+# STAGE 2: MODEL FOLDER CHECKS (MATRIX)
 # -------------------------------------------
-check_model_falcon_r1:
+.check_model_template: &check_model_template
   stage: Model Check
   image: alpine:latest
-  script:
-    - test -d "Src/Model/falcon_r1" && echo "✅ falcon_r1 OK" || (echo "❌ falcon_r1 missing" && exit 1)
   needs: [check_git_access]
+  script:
+    - test -d "Src/Model/${FALCON_DIR}" && echo "✅ ${FALCON_DIR} OK" || (echo "❌ ${FALCON_DIR} missing" && exit 1)
 
-check_model_falcon_r2:
-  stage: Model Check
-  image: alpine:latest
-  script:
-    - test -d "Src/Model/falcon_r2" && echo "✅ falcon_r2 OK" || (echo "❌ falcon_r2 missing" && exit 1)
-  needs: [check_git_access]
-
-check_model_falcon_r3:
-  stage: Model Check
-  image: alpine:latest
-  script:
-    - test -d "Src/Model/falcon_r3" && echo "✅ falcon_r3 OK" || (echo "❌ falcon_r3 missing" && exit 1)
-  needs: [check_git_access]
-
-check_model_falcon_r4:
-  stage: Model Check
-  image: alpine:latest
-  script:
-    - test -d "Src/Model/falcon_r4" && echo "✅ falcon_r4 OK" || (echo "❌ falcon_r4 missing" && exit 1)
-  needs: [check_git_access]
+check_model_folders:
+  <<: *check_model_template
+  parallel:
+    matrix:
+      - FALCON_DIR: "falcon_r1"
+      - FALCON_DIR: "falcon_r2"
+      - FALCON_DIR: "falcon_r3"
+      - FALCON_DIR: "falcon_r4"
 
 # -------------------------------------------
-# STAGE 3: BUILD IMAGE AFTER MODEL FILES
+# STAGE 3: BUILD & PUSH DOCKER IMAGE
 # -------------------------------------------
 build_application_image:
   stage: Build Whole Model
@@ -66,26 +54,95 @@ build_application_image:
     - docker:20.10.16-dind
   variables:
     DOCKER_TLS_CERTDIR: ""
+  needs:
+    - check_model_folders
   before_script:
     - echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_USER" --password-stdin
   script:
     - echo "📦 Validating .pt files..."
     - |
-      for i in 1 2 3; do
-        if [ ! -f "Src/deploy/models/falcon_r$i.pt" ]; then
-          echo "❌ Missing: Src/deploy/models/falcon_r$i.pt"
+      for i in 1 2 3 4; do
+        if [ ! -f "Src/deploy/models/falcon_r${i}.pt" ]; then
+          echo "❌ Missing: Src/deploy/models/falcon_r${i}.pt"
           exit 1
         fi
       done
-    - docker build -t $FULL_IMAGE_NAME -f Src/deploy/Dockerfile Src/deploy
-    - docker push $FULL_IMAGE_NAME
-  needs:
-    - check_model_falcon_r1
-    - check_model_falcon_r2
-    - check_model_falcon_r3
-    - check_model_falcon_r4
+    - docker build -t "$FULL_IMAGE_NAME" -f Src/deploy/Dockerfile Src/deploy
+    - docker push "$FULL_IMAGE_NAME"
   rules:
-    - if: $CI_COMMIT_BRANCH
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: always
+    - when: never
 
-# Remaining stages stay unchanged and follow previous structure...
-# (ocr_classification_test, application_tests, deploy_application, build_documentation)
+# -------------------------------------------
+# STAGE 4: MODEL PROCESSING
+# -------------------------------------------
+model_processing:
+  stage: model_processing
+  image: python:3.9-alpine
+  needs:
+    - build_application_image
+  script:
+    - echo "🔄 Running model processing..."
+    # – your actual commands here –
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: always
+    - when: never
+
+# -------------------------------------------
+# STAGE 5: TEST
+# -------------------------------------------
+application_tests:
+  stage: test
+  image: python:3.9
+  needs:
+    - model_processing
+  script:
+    - echo "🧪 Running application-level tests..."
+    # – your test commands here –
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: always
+    - when: never
+
+# -------------------------------------------
+# STAGE 6: DEPLOY
+# -------------------------------------------
+deploy_application:
+  stage: deploy
+  image: docker:20.10.16
+  services:
+    - docker:20.10.16-dind
+  needs:
+    - application_tests
+  before_script:
+    - echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_USER" --password-stdin
+  script:
+    - echo "🚀 Deploying application container..."
+    # – e.g., docker push $FULL_IMAGE_NAME or helm upgrade ––
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: always
+    - when: never
+
+# -------------------------------------------
+# STAGE 7: BUILD DOCS
+# -------------------------------------------
+build_documentation:
+  stage: build_docs
+  image: docker:20.10.16
+  services:
+    - docker:20.10.16-dind
+  needs:
+    - deploy_application
+  before_script:
+    - echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_USER" --password-stdin
+  script:
+    - echo "📚 Building and pushing docs container..."
+    # – e.g., docker build -t ghcr.io/$GITHUB_USER/psmprotech_docs:main -f docs/Dockerfile docs
+    # - docker push ghcr.io/$GITHUB_USER/psmprotech_docs:main
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: always
+    - when: never
