@@ -1,13 +1,17 @@
 \documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}  % Ensure proper UTF-8 character support
 \usepackage[margin=2.5cm]{geometry}
 \usepackage{graphicx}
 \usepackage{caption}
 \usepackage{subcaption}
 \usepackage{hyperref}
 \usepackage{amsmath}
-\hypersetup{colorlinks=true, urlcolor=blue, linkcolor=blue}
+\usepackage{wasysym}         % Provides \diameter symbol
+\usepackage{newunicodechar}  % Support for Unicode characters
 \usepackage{float}
 
+\hypersetup{colorlinks=true, urlcolor=blue, linkcolor=blue}
+\newunicodechar{\diameter}{\diameter}  % Define the Unicode diameter symbol
 
 \title{\textbf{PSM Protech Feasibility Study}\\Technical Documentation}
 \author{Internal Project Documentation \\ PSM Protech}
