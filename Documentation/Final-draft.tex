@@ -1,17 +1,17 @@
 \documentclass[11pt,a4paper]{article}
-\usepackage[utf8]{inputenc}  % Ensure proper UTF-8 character support
 \usepackage[margin=2.5cm]{geometry}
 \usepackage{graphicx}
 \usepackage{caption}
 \usepackage{subcaption}
 \usepackage{hyperref}
 \usepackage{amsmath}
-\usepackage{wasysym}         % Provides \diameter symbol
-\usepackage{newunicodechar}  % Support for Unicode characters
-\usepackage{float}
-
 \hypersetup{colorlinks=true, urlcolor=blue, linkcolor=blue}
-\newunicodechar{\diameter}{\diameter}  % Define the Unicode diameter symbol
+\usepackage{float}
+\usepackage{wasysym}
+\usepackage[utf8]{inputenc}
+\DeclareUnicodeCharacter{2300}{\diameter}   % 2300 is the hex code of ⌀
+
+
 
 \title{\textbf{PSM Protech Feasibility Study}\\Technical Documentation}
 \author{Internal Project Documentation \\ PSM Protech}
@@ -86,7 +86,7 @@ Ultimately, achieving these goals would mean that when a new part drawing or an 
 \begin{center}
   \includegraphics[width=\textwidth]{Rich-Picure.drawio.png}\\[5mm]
   % “5mm” of extra vertical space before the next line
-  This is the rich picture.
+    Rich Picture
 \end{center}
 
 \section{Methodology}
@@ -103,7 +103,13 @@ At a high level, the methodology is as follows:
 In summary, our methodology is a hybrid approach that blends machine learning for pattern recognition (tolerance symbols classification) with OCR techniques for reading text. By breaking down the problem into these components, we address each challenge (visual classification vs. text reading) with an appropriate tool, and then assemble the pieces into a cohesive pipeline.
 
 \section{System Architecture}
-The system architecture for the proposed solution can be viewed as a pipeline of modular components, each responsible for a specific function in the overall process of tolerance extraction. Figure~\ref{fig:arch_flow} illustrates the conceptual flow of data through the system, from input drawing to output report. The main components of the architecture include:
+The system architecture for the proposed solution can be viewed as a pipeline of modular components, each responsible for a specific function in the overall process of tolerance extraction. illustrates the conceptual flow of data through the system, from input drawing to output report. The main components of the architecture include:
+\begin{figure}[h!]
+\centering
+\includegraphics[width=0.9\textwidth]{System Archi.png}
+\caption{System architecture overview showing the flow from input drawing to extracted tolerance data. (This is a placeholder for a high-level flowchart or diagram.)}
+\label{fig:Arch_Flow}
+\end{figure}
 
 \begin{itemize}
   \item \textbf{Input Module}: Accepts the engineering drawing input. In the current feasibility study, this is either a PDF file or image files (e.g., scanned drawings or synthesized images). Preprocessing may be applied here to improve image quality (e.g., converting CAD PDFs to images, grayscaling, etc.).
@@ -112,13 +118,6 @@ The system architecture for the proposed solution can be viewed as a pipeline of
   \item \textbf{OCR Extraction Module}: Parallel to (or following) classification, the system extracts the numerical tolerance values from the annotation. This is done by the OCR pipeline which may involve converting the region to PDF (to leverage any embedded text via parsing) and/or directly applying image OCR. The module returns the numeric value(s) associated with that tolerance. For example, it might read a value like “0.05” from the image, possibly also capturing any modifier (though currently we focus on the numeric magnitude).
   \item \textbf{Data Aggregation and Output}: The results from classification and OCR are combined. Each tolerance annotation thus yields a structured record (e.g., \{type: flatness, value: 0.05, units: mm, referenced datums: A, B\}). These records are then compiled into an output format such as a CSV file or a summarized report. The output can be reviewed by engineers or fed into further analysis tools to check feasibility criteria. In our prototype, the OCR pipeline writes the results to a CSV file for simplicity.
 \end{itemize}
-
-%\begin{figure}[h!]
-%\centering
-%\includegraphics[width=0.9\textwidth]{architecture_diagram.png}
-%\caption{System architecture overview showing the flow from input drawing to extracted tolerance data. (This is a placeholder for a high-level flowchart or diagram.)}
-%\label{fig:arch_flow}
-%\end{figure}
 
 The above architecture is modular: the classification and OCR extraction components operate independently and can be improved or replaced without affecting the other, as long as they adhere to the defined interface (input image, output label or text). Currently, these components are implemented as separate scripts, and integration is done manually by feeding the output of one into the other. As the project progresses, these will be unified into a single pipeline. Notably, in this feasibility stage, we have deliberately separated the concerns of “what is the tolerance type?” and “what is the tolerance value?”, but in a production system they would work in tandem on each detected annotation region.
 
@@ -152,7 +151,7 @@ The tolerance classification model is based on the YOLOv8 architecture, configur
     \item \textbf{Dataset Parsing}: The script scans the dataset directory (containing our annotated synthetic images). It automatically infers class names by looking at the filename prefixes (each image file is named with its class, e.g., \verb|form_flatness.png|, \verb|form_cylindricity.png|, etc.). All images are grouped by class label.
     \item \textbf{Train-Validation Split}: The gathered images for each class are split into a training set and a validation set (80\% train, 20\% val). This ensures that we can evaluate the model’s generalization on images it wasn’t trained on. The script creates a directory structure expected by YOLO (separate \verb|train/| and \verb|val/| folders, each containing subfolders for each class with the respective images).
     \item \textbf{Model Training}: We load a YOLOv8 classification model with pre-trained weights (in our case, we specified the \verb|yolov8l-cls.pt| model, which is a large variant for classification). The training is then executed via the Ultralytics API call \verb|model.train(...)|, specifying parameters such as number of epochs (we used 10 epochs as an initial training period), image size (224 pixels), batch size (32), and the device (using GPU if available). The model automatically learns to distinguish the classes by adjusting its internal weights on the training images. During training, we can see progress metrics such as training/validation accuracy and loss.
-    \item \textbf{Model Saving}: After training, the best-performing model weights (based on validation loss) are saved to disk (the script will output the path, typically \verb|runs/classify/train/weights/best.pt| or similar). This saved model can later be loaded for inference on new images.
+    \item \textbf{Model Saving}: After training, the best-performing model weights (based on validation loss) are saved to disk (the script will output the path, typically \texttt{}|runs/classify/train/weights/best.pt| or similar). This saved model can later be loaded for inference on new images.
 \end{enumerate}
 
 In essence, the classification model learns to recognize different GD\&T symbols. For example, the flatness symbol (a parallelogram shape) looks very different from the cylindricity symbol (which appears as a circle or cylinder icon). By training on many examples of each, the CNN can reliably identify the type when shown a new instance. This classifier will be crucial when processing a full drawing: it will allow the system to know what kind of tolerance each detected annotation represents, which is necessary for any further reasoning (like understanding which tolerances are critical, or grouping similar types, etc.).
@@ -310,7 +309,7 @@ The pipeline also logs when it cannot find a number in a region. In our tests, w
 To illustrate the kind of output the system produces, consider two examples:
 \begin{enumerate}
   \item \textbf{Flatness 0.05 mm:} Input was an image of a flatness symbol with “0.05” next to it. The classification model labeled it as flatness. The OCR pipeline output a CSV row: \verb|source_image: "flatness_005", col2: 0.05|. (In this case, only one column had a number, so \verb|col3| was empty.) The result correctly reflects the tolerance value 0.05.
-  \item \textbf{Cylindricity 0.1 mm (with datum):} Input was an image of a cylindricity callout “⌀0.1 M \textbf{A}” (for instance, a diameter symbol 0.1 with a material condition M and referencing datum A). In our synthetic setup, the numeric part is 0.1. The classification model predicted cylindricity. The OCR pipeline returned \verb|0.10| for the value. It ignored the diameter symbol and the letter because we configured it to only capture numbers. This indicates the numeric reading works, but it also highlights a limitation: any letter or special symbol (like the diameter sign or datum labels) are not captured in the current OCR scheme. We would handle those differently if needed (perhaps via classification or separate OCR pass without digit-only restriction).
+\item \textbf{Cylindricity 0.1 mm (with datum):} Input was an image of a cylindricity callout “⌀0.1 M \textbf{A}” (for instance, a diameter symbol 0.1 with a material condition M and referencing datum A). In our synthetic setup, the numeric part is 0.1. The classification model predicted cylindricity. The OCR pipeline returned \verb|0.10| for the value. It ignored the diameter symbol and the letter because we configured it to only capture numbers. This indicates the numeric reading works, but it also highlights a limitation: any letter or special symbol (like the diameter sign or datum labels) are not captured in the current OCR scheme. We would handle those differently if needed (perhaps via classification or separate OCR pass without digit-only restriction).
 \end{enumerate}
 These examples give us confidence that the pipeline is extracting the core numeric data correctly.
 
@@ -318,6 +317,51 @@ These examples give us confidence that the pipeline is extracting the core numer
 The results so far demonstrate that, under controlled conditions, the approach of using a classifier plus OCR is feasible. We have effectively created a digital reader that can look at a simplified drawing snippet and tell us “this is a flatness tolerance of value 0.05 mm,” which is the kind of interpretation we ultimately want for real drawings. The next step will be to test how well this performance translates to more realistic scenarios.
 
 One metric we consider is the end-to-end accuracy: the percentage of tolerance annotations on a drawing that the system can correctly interpret (both type and value). On synthetic data, this is nearly 100\%. On real data, our target is to get this as high as possible (ideally \textgreater 90\%) to consider the system viable. Achieving that will require addressing the constraints mentioned earlier.
+
+
+\section{Deployment & CI/CD Integration}
+To ensure consistent runtime environments and seamless portability across development, testing, and production systems, the entire Falcon pipeline has been fully containerized using \textbf{Docker}. This guarantees that all dependencies, configurations, and versions remain uniform regardless of the host system, thus eliminating the common "it works on my machine" issue.
+
+\subsection{Dockerization}
+
+Each module within the pipeline—including preprocessing, sub-crop detection, classification, and data extraction—is encapsulated in its own Docker container. These modular containers interact via well-defined APIs and mounted volumes, enabling:
+
+\begin{itemize}
+    \item Clean separation of concerns
+    \item Easier debugging and testing
+    \item Reproducible experiments
+    \item Simplified onboarding for new developers
+\end{itemize}
+
+Docker images are versioned and tagged according to both commit hashes and semantic versioning principles, enabling robust traceability and rollback capabilities.
+
+\subsection{Automated Build \& Continuous Deployment via GitLab CI/CD}
+
+A fully automated CI/CD pipeline is implemented using \textbf{GitLab CI} to streamline the development lifecycle. The workflow includes:
+
+\begin{itemize}
+    \item \textbf{Build Trigger:} Every commit or merge request to the main branch triggers a CI job.
+    \item \textbf{Image Build:} A fresh Docker image is constructed using a predefined \texttt{Dockerfile}, incorporating the latest source code, environment variables, and dependencies.
+    \item \textbf{Image Push:} The newly built image is pushed to a secured Docker container registry (self-hosted or GitLab container registry).
+    \item \textbf{Automated Deployment:}
+    \begin{itemize}
+        \item The university’s server infrastructure, configured with secure access tokens, continuously polls for the latest Docker image.
+        \item Upon detecting an updated image, the server automatically pulls and deploys it, ensuring that the most current version of the pipeline—including model weights, configurations, and scripts—is always live.
+    \end{itemize}
+\end{itemize}
+
+This pipeline reduces downtime, enforces consistency, and accelerates the release cycle without requiring manual intervention.
+
+\subsection{Scalability and Future-Proofing}
+
+The pipeline is designed with extensibility and scalability in mind. Future enhancements are accommodated by the following architectural provisions:
+
+\begin{itemize}
+    \item \textbf{Support for LLM-Based Modules:} The system is prepared to integrate large language models (LLMs) for context-aware extraction and interpretation tasks, enabling semantic document understanding in downstream stages.
+    \item \textbf{Vision Transformer (ViT) Compatibility:} The modular detection and classification stages support plug-and-play integration with transformer-based vision models, allowing the system to evolve with advancements in computer vision.
+    \item \textbf{Agent-Based Resource Orchestration:} For high-load environments or cloud-scale deployment, the architecture supports agent-based orchestration (e.g., using Kubernetes or Nomad). These agents can dynamically allocate and scale compute resources, enabling parallel job execution, load balancing, and fault tolerance.
+\end{itemize}
+
 
 \section{Next Steps}
 With a foundational solution in place and positive initial results, the project will now move into subsequent phases to enhance and expand the system. The next steps include:
