@@ -1,4 +1,0 @@
-2025-05-25 04:05:54,287 - ERROR - Model file not found: models/falcon_r2.pt
-2025-05-25 05:31:31,010 - ERROR - Model file not found: models/falcon_r1.pt
-2025-05-25 05:31:35,340 - ERROR - Failed to load YOLO model: [Errno 2] No such file or directory: 'models\\falcon_r1.pt'
-2025-05-25 05:31:35,352 - ERROR - Skipping preprocessing as the model could not be loaded.

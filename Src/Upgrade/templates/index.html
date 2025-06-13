@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PSM Prototype by PixMind - Team</title>
+    {{ bootstrap.load_css() }}
+    <style>
+        .upload-container {
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        .progress {
+            display: none;
+            margin-top: 20px;
+        }
+        #status {
+            margin-top: 20px;
+            display: none;
+        }
+        #detailedStatus {
+            margin-top: 10px;
+            font-size: 0.9em;
+            color: #666;
+        }
+        .stage-indicator {
+            margin-top: 15px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="passwordPromptContainer" class="upload-container" style="max-width: 400px;">
+            <h3 class="text-center mb-3">Enter Password</h3>
+            <input type="password" id="passwordInput" class="form-control mb-2" placeholder="Password">
+            <button id="passwordSubmitButton" class="btn btn-primary w-100">Submit</button>
+            <p id="passwordError" class="text-danger text-center mt-2" style="display: none;">Incorrect password.</p>
+        </div>
+
+        <div id="mainContent" style="display: none;">
+            <div class="upload-container">
+                <h2 class="text-center mb-4">PSM Prototype by PixMind - Team</h2>
+                <form id="uploadForm">
+                    <div class="mb-3">
+                        <label for="file" class="form-label">Select Image or PDF</label>
+                        <input type="file" class="form-control" id="file" name="file" accept="image/*,.pdf" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Upload and Process</button>
+                </form>
+                
+                <div class="progress">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                </div>
+                
+                <div class="stage-indicator"></div>
+                <div id="detailedStatus"></div>
+                <div id="status" class="alert" role="alert"></div>
+                <div id="downloadContainer" style="margin-top: 20px; display: none;">
+                    <a href="#" id="downloadLink" class="btn btn-success w-100">Download Last Report</a>
+                    <button id="deleteReportButton" class="btn btn-danger w-100 mt-2" style="display: none;">Delete Last Report</button>
+                </div>
+                <div style="margin-top: 30px; text-align: center;">
+                    <a href="{{ url_for('reports_page') }}" class="btn btn-info">View All Reports</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{ bootstrap.load_js() }}
+    <script>
+        let progressInterval;
+        let currentReportFilename = null; // Store the filename for deletion
+        
+        function updateProgress() {
+            fetch('/progress')
+                .then(response => response.json())
+                .then(data => {
+                    const progressBar = document.querySelector('.progress-bar');
+                    const stageIndicator = document.querySelector('.stage-indicator');
+                    const detailedStatus = document.getElementById('detailedStatus');
+                    const statusDiv = document.getElementById('status');
+                    const downloadContainer = document.getElementById('downloadContainer');
+                    const downloadLink = document.getElementById('downloadLink');
+                    const deleteReportButton = document.getElementById('deleteReportButton');
+                    
+                    progressBar.style.width = data.progress + '%';
+                    progressBar.setAttribute('aria-valuenow', data.progress);
+                    
+                    stageIndicator.textContent = `${data.current_stage}`;
+                    detailedStatus.textContent = data.status;
+                    
+                    if (data.error) {
+                        statusDiv.className = 'alert alert-danger';
+                        statusDiv.textContent = 'Error: ' + data.error;
+                        statusDiv.style.display = 'block';
+                        downloadContainer.style.display = 'none'; // Hide download link on error
+                        deleteReportButton.style.display = 'none'; // Hide delete button on error
+                        currentReportFilename = null;
+                        clearInterval(progressInterval);
+                    }
+                    
+                    if (data.complete) {
+                        if (!data.error) { // Only show success and download if no error
+                            statusDiv.className = 'alert alert-success';
+                            statusDiv.textContent = 'Processing completed successfully!';
+                            if (data.report_file_path) {
+                                downloadLink.href = "{{ url_for('download_last_report') }}"; // Updated to use url_for
+                                currentReportFilename = data.report_file_path.split('/').pop().split('\\').pop(); 
+                                downloadLink.setAttribute('download', currentReportFilename);
+                                downloadContainer.style.display = 'block';
+                                deleteReportButton.style.display = 'block'; // Show delete button
+                            } else {
+                                downloadContainer.style.display = 'none';
+                                deleteReportButton.style.display = 'none';
+                                currentReportFilename = null;
+                                detailedStatus.textContent += " (No report file available for download)";
+                            }
+                        } // else error already handled
+                        statusDiv.style.display = 'block';
+                        clearInterval(progressInterval);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching progress:', error);
+                });
+        }
+
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData();
+            const fileInput = document.getElementById('file');
+            formData.append('file', fileInput.files[0]);
+            
+            const progress = document.querySelector('.progress');
+            const progressBar = progress.querySelector('.progress-bar');
+            const status = document.getElementById('status');
+            const stageIndicator = document.querySelector('.stage-indicator');
+            const detailedStatus = document.getElementById('detailedStatus');
+            const downloadContainer = document.getElementById('downloadContainer');
+            const deleteReportButton = document.getElementById('deleteReportButton');
+            
+            // Reset and show progress elements
+            progress.style.display = 'block';
+            progressBar.style.width = '0%';
+            status.style.display = 'none';
+            stageIndicator.textContent = '';
+            detailedStatus.textContent = '';
+            downloadContainer.style.display = 'none'; // Hide download link on new upload
+            deleteReportButton.style.display = 'none'; // Hide delete button on new upload
+            currentReportFilename = null;
+            
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    // Start progress polling
+                    progressInterval = setInterval(updateProgress, 1000);
+                } else {
+                    throw new Error(await response.text());
+                }
+            } catch (error) {
+                status.textContent = 'Error: ' + error.message;
+                status.className = 'alert alert-danger';
+                status.style.display = 'block';
+            }
+        });
+
+        document.getElementById('deleteReportButton').addEventListener('click', async () => {
+            if (!currentReportFilename) {
+                alert('No report selected for deletion.');
+                return;
+            }
+
+            if (!confirm(`Are you sure you want to delete ${currentReportFilename}?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/delete_report', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ filename: currentReportFilename })
+                });
+                const result = await response.json();
+                const statusDiv = document.getElementById('status');
+                const downloadContainer = document.getElementById('downloadContainer');
+                const deleteReportButton = document.getElementById('deleteReportButton');
+
+                if (result.success) {
+                    statusDiv.className = 'alert alert-info';
+                    statusDiv.textContent = result.message;
+                    downloadContainer.style.display = 'none';
+                    deleteReportButton.style.display = 'none';
+                    currentReportFilename = null;
+                    // Optionally, re-fetch progress to update UI based on server state
+                    // updateProgress(); 
+                } else {
+                    statusDiv.className = 'alert alert-danger';
+                    statusDiv.textContent = 'Error deleting report: ' + result.error;
+                }
+                statusDiv.style.display = 'block';
+            } catch (error) {
+                const statusDiv = document.getElementById('status');
+                statusDiv.textContent = 'Error: ' + error.message;
+                statusDiv.className = 'alert alert-danger';
+                statusDiv.style.display = 'block';
+            }
+        });
+
+        // Password Protection Logic
+        document.getElementById('passwordSubmitButton').addEventListener('click', () => {
+            const passwordInput = document.getElementById('passwordInput');
+            const passwordError = document.getElementById('passwordError');
+            const mainContent = document.getElementById('mainContent');
+            const passwordPromptContainer = document.getElementById('passwordPromptContainer');
+
+            if (passwordInput.value === 'pixmind') {
+                passwordPromptContainer.style.display = 'none';
+                mainContent.style.display = 'block';
+                passwordError.style.display = 'none';
+            } else {
+                passwordError.style.display = 'block';
+                passwordInput.focus();
+                passwordInput.select();
+            }
+        });
+
+        // Optional: Allow submitting password with Enter key
+        document.getElementById('passwordInput').addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault(); // Prevent default form submission if it were in a form
+                document.getElementById('passwordSubmitButton').click();
+            }
+        });
+    </script>
+</body>
+</html>

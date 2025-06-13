@@ -1,0 +1,157 @@
+import torch
+import torchvision.transforms as transforms
+from PIL import Image
+import os
+from ultralytics import YOLO
+
+class ClassificationModel:
+    def __init__(self, model_path):
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        try:
+            # First try loading as a YOLO model
+            self.model = YOLO(model_path)
+            self.is_yolo = True
+            print("Loaded YOLO model successfully")
+        except Exception as e:
+            print(f"Not a YOLO model ({str(e)}), trying PyTorch model...")
+            # If that fails, try loading as a regular PyTorch model
+            try:
+                self.model = torch.load(model_path, map_location=self.device)
+                if hasattr(self.model, 'eval'):
+                    self.model.eval()
+                self.is_yolo = False
+                print("Loaded PyTorch model successfully")
+            except Exception as e:
+                raise RuntimeError(f"Failed to load model from {model_path}: {str(e)}")
+        
+        # Setup image transforms for PyTorch model
+        self.transform = transforms.Compose([
+            transforms.Resize((640, 640)),  # YOLO default size
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                              std=[0.229, 0.224, 0.225])
+        ])
+
+    def predict(self, image_path):
+        """Predict class for an image"""
+        try:
+            if self.is_yolo:
+                # Use YOLO's built-in inference
+                results = self.model(image_path)
+                print(f"YOLO Results: {results}")
+                # Get the most confident prediction
+                if len(results) > 0 and hasattr(results[0], 'probs'):
+                    probs = results[0].probs
+                    predicted_class = int(probs.top1)
+                    confidence = float(probs.top1conf)
+                    class_name = self.model.names[predicted_class]
+                    return class_name, confidence
+                else:
+                    raise RuntimeError("No valid predictions from YOLO model")
+            else:
+                # Traditional PyTorch inference
+                image = Image.open(image_path).convert('RGB')
+                image_tensor = self.transform(image).unsqueeze(0).to(self.device)
+                
+                with torch.no_grad():
+                    outputs = self.model(image_tensor)
+                    probabilities = torch.nn.functional.softmax(outputs[0], dim=0)
+                    predicted_class = torch.argmax(probabilities).item()
+                    confidence = probabilities[predicted_class].item()
+                    
+                    # Get class name if available
+                    if hasattr(self.model, 'class_names'):
+                        class_name = self.model.class_names[predicted_class]
+                    else:
+                        # Try to load class names from file
+                        class_names_path = os.path.join(os.path.dirname(model_path), 'class_names.txt')
+                        if os.path.exists(class_names_path):
+                            with open(class_names_path, 'r') as f:
+                                class_names = [line.strip() for line in f]
+                            class_name = class_names[predicted_class]
+                        else:
+                            class_name = f"class_{predicted_class}"
+                    
+                    return class_name, confidence
+                    
+        except Exception as e:
+            raise RuntimeError(f"Error predicting {image_path}: {str(e)}")
+
+def process_r3(input_data):
+    """
+    Stage 3: Classify images using the classification model
+    """
+    if not input_data:
+        print("Warning: No images to process in Stage 3")
+        return []
+        
+    try:
+        # Load classification model
+        model_path = 'models/falcon_r3.pt'
+        if not os.path.exists(model_path):
+            raise RuntimeError(f"Model file not found: {model_path}")
+            
+        model = load_model(model_path)
+        
+        # Define image transforms
+        transform = transforms.Compose([
+            transforms.Resize((224, 224)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                               std=[0.229, 0.224, 0.225])
+        ])
+        
+        # Get class names from model or define them
+        try:
+            class_names = model.class_names if hasattr(model, 'class_names') else None
+            if class_names is None:
+                # Fallback to checking a class names file
+                class_names_path = 'models/falcon_r3_classes.txt'
+                if os.path.exists(class_names_path):
+                    with open(class_names_path, 'r') as f:
+                        class_names = [line.strip() for line in f.readlines()]
+                else:
+                    # Fallback to numbered classes
+                    num_classes = model.fc.out_features if hasattr(model, 'fc') else 1000
+                    class_names = [f"class_{i}" for i in range(num_classes)]
+        except Exception as e:
+            print(f"Warning: Could not load class names: {str(e)}")
+            class_names = [f"class_{i}" for i in range(1000)]  # fallback
+        
+        results = []
+        
+        for item in input_data:
+            image_path = item['path']
+            if not os.path.exists(image_path):
+                print(f"Warning: Image not found: {image_path}")
+                continue
+                
+            try:
+                # Load and transform image
+                image = Image.open(image_path).convert('RGB')
+                image_tensor = transform(image).unsqueeze(0)
+                
+                # Run inference
+                with torch.no_grad():
+                    output = model(image_tensor)
+                    probabilities = torch.nn.functional.softmax(output[0], dim=0)
+                    predicted_class = torch.argmax(probabilities).item()
+                    confidence = probabilities[predicted_class].item()
+                
+                # Add classification results to the item
+                class_name = class_names[predicted_class] if predicted_class < len(class_names) else f"class_{predicted_class}"
+                item.update({
+                    'classified_class': class_name,
+                    'classification_confidence': float(confidence)
+                })
+                
+                results.append(item)
+                
+            except Exception as e:
+                print(f"Warning: Error processing image {image_path}: {str(e)}")
+                continue
+        
+        return results
+        
+    except Exception as e:
+        raise RuntimeError(f"Error in classification stage: {str(e)}")
