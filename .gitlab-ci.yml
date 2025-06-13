@@ -131,18 +131,24 @@ deploy_application:
 # -------------------------------------------
 build_documentation:
   stage: build_docs
-  image: docker:20.10.16
-  services:
-    - docker:20.10.16-dind
-  needs:
-    - deploy_application
-  before_script:
-    - echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_USER" --password-stdin
+  image: danteev/texlive
   script:
-    - echo "📚 Building and pushing docs container..."
-    # – e.g., docker build -t ghcr.io/$GITHUB_USER/psmprotech_docs:main -f docs/Dockerfile docs
-    # - docker push ghcr.io/$GITHUB_USER/psmprotech_docs:main
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
-      when: always
-    - when: never
+    - |
+      if [ -d "Documentation" ]; then
+        cd Documentation
+        echo "📚 Building LaTeX documentation..."
+        for file in *.tex; do
+          if [ -f "$file" ]; then
+            latexmk -pdf "$file"
+          fi
+        done
+      else
+        echo "⚠️ Documentation folder not found."
+      fi
+  artifacts:
+    paths:
+      - Documentation/*.pdf
+    expire_in: 1 week
+    when: always
+  needs: [deploy_application]
+
