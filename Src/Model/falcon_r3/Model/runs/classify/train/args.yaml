@@ -1,7 +1,7 @@
 task: classify
 mode: train
 model: yolov8l-cls.pt
-data: C:\Users\Admin\psm\PSM-Protech-Feasibility-Study\Src\Model\OCR_Classification\Dataset\YOLO_Classification_Dataset\data.yaml
+data: /Users/mugeshvaikundamani/Library/Mobile Documents/com~apple~CloudDocs/THRo/PSE/PSM-Protech-Feasibility-Study/Src/Model/falcon_r3/YOLO_Classification_Dataset_new
 epochs: 10
 time: null
 patience: 100
@@ -36,7 +36,6 @@ dropout: 0.0
 val: true
 split: val
 save_json: false
-save_hybrid: false
 conf: null
 iou: 0.7
 max_det: 300
@@ -96,11 +95,11 @@ fliplr: 0.5
 bgr: 0.0
 mosaic: 1.0
 mixup: 0.0
+cutmix: 0.0
 copy_paste: 0.0
 copy_paste_mode: flip
 auto_augment: randaugment
 erasing: 0.4
-crop_fraction: 1.0
 cfg: null
 tracker: botsort.yaml
-save_dir: runs\classify\train
+save_dir: runs/classify/train

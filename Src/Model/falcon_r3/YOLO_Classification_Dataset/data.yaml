@@ -1,0 +1,4 @@
+{names: [form_cylindricity, form_flatness, form_line_profile, form_roundness, form_surface_profile,
+    location_coaxiality, location_concentricity, location_position, location_symmetry,
+    none, orientation_parallelism, orientation_perpendicularity, orientation_surface_profile,
+    run_out_circular_run_out], nc: 14, test: test, train: train, val: val}

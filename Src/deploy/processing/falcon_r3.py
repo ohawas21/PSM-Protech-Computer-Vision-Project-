@@ -3,10 +3,18 @@ import torchvision.transforms as transforms
 from PIL import Image
 import os
 from ultralytics import YOLO
+import yaml
+
+def load_confidence_threshold():
+    config_path = os.path.join(os.path.dirname(__file__), '..', 'config.yaml')
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
+    return config.get('confidence_threshold', 0.5)
 
 class ClassificationModel:
     def __init__(self, model_path):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.confidence = load_confidence_threshold()
         try:
             # Load model
             self.model = YOLO(model_path)
@@ -27,7 +35,7 @@ class ClassificationModel:
         """Predict class for an image"""
         try:
             if self.is_yolo:
-                results = self.model(image_path)
+                results = self.model(image_path, conf=self.confidence)
                 if len(results) > 0 and hasattr(results[0], 'probs'):
                     probs = results[0].probs
                     predicted_class = int(probs.top1)
