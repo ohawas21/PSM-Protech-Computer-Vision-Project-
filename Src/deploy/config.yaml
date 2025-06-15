@@ -1,0 +1,2 @@
+# Configuration file for model thresholds and other settings
+confidence_threshold: 0.5

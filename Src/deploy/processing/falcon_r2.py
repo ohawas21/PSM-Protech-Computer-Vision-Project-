@@ -1,6 +1,7 @@
 import os
 import cv2
 from ultralytics import YOLO
+import yaml
 
 def get_results_dir(image_path):
     """Get the results directory for a given R1 crop"""
@@ -15,6 +16,12 @@ def get_results_dir(image_path):
     # Construct results directory path
     return os.path.join('results', parent_dir)
 
+def load_confidence_threshold():
+    config_path = os.path.join(os.path.dirname(__file__), '..', 'config.yaml')
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
+    return config.get('confidence_threshold', 0.5)
+
 def process_r2(input_paths):
     """
     Stage 2: Process R1 crops to detect and organize sub-components
@@ -24,6 +31,7 @@ def process_r2(input_paths):
     
     # Load YOLO model
     model = YOLO('models/falcon_r2.pt')
+    confidence = load_confidence_threshold()
     
     processed_data = []
     
@@ -48,7 +56,7 @@ def process_r2(input_paths):
         os.makedirs(results_output_dir, exist_ok=True)
         
         # Run YOLO inference
-        results = model(image)
+        results = model(image) #, conf=confidence)
         
         # Process detections
         for r in results:

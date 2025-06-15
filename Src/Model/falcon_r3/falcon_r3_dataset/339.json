@@ -1,0 +1,40 @@
+{
+  "version": "5.8.1",
+  "flags": {},
+  "shapes": [
+    {
+      "label": "form_flatness",
+      "points": [
+        [
+          4.649999999999999,
+          3.6000000000000014
+        ],
+        [
+          31.050000000000004,
+          3.1000000000000014
+        ],
+        [
+          28.85,
+          17.199999999999996
+        ],
+        [
+          4.649999999999999,
+          18.6
+        ],
+        [
+          4.450000000000003,
+          10.0
+        ]
+      ],
+      "group_id": null,
+      "description": "",
+      "shape_type": "polygon",
+      "flags": {},
+      "mask": null
+    }
+  ],
+  "imagePath": "339.png",
+  "imageData": "iVBORw0KGgoAAAANSUhEUgAAAD0AAAAUCAYAAAA+wTUXAAADGUlEQVR4nOWYP0gjXRTFf4kpREjhn4haCBZRIxZqIFjZWJiAYAoRkSBMFzAgFoKkEAtlEBELxUoQAklAbVVE1EJFYyHYBVIELCRCDI4anKCZ9xXf7rLuJnFmQS085bxz77v3zrlv7jyTEEI8Pz+TzWb5LrAAhMNh6uvrMZvNXxKEoiiEQiECgQAmk+nD97MAmEwm3G43ZWVlH75hIdze3rK7u4vH4/mUpL/m1X4xvmXSFiPkTCbD5OQkzc3NhmWYz+exWq0EAgHdNufn5xwcHDAwMEB7e7tuu6urK2w2Gw0NDYUJQgixtrYmXl9fxXuIRCIiHA6/y/sTmqaJ09NTsbq6WnA9lUqJ0dFRoWnar2fJZFK43W4Ri8WE1+sVDw8PuvZKJBKisbFRbG1tFeXolvfT0xPxeJyhoSHdFf+J6+tr5ufnGR4e1sVXVZVgMMj09DQul4uJiQnGxsa4u7sraXd4eMj4+DiSJJXk6Upa0zRWVlZwOBxYLIY6AoCNjQ0CgQCVlZW6+CcnJzgcDrq7uwHo6enB4/FwdnZW0m5zc5P19XU6OztL8nQlfXl5SSKRwOv16gr6d9zc3JDL5ejt7dVtc39/T0dHx5tzo62tDSFESbvl5WVqa2vf9W8OBoPs7++XJG1vb7OwsEB5ebm+qH8gn88zNTVFX1+f4cHnX77XelVoliSJrq6uooR4PE5FRYVuaf6O4+NjbDbbu3L7bJjtdjvV1dUFFxVFwefz0d/fb7jyQggikQhzc3P/dA78KWVVVQ37KIaSmtvZ2cHv99PS0mLIqRCCvb09nE6n4ZYAcDqdhEIhFEUB4PHxkcXFRex2+5s9jo6OyOfzhv0XTfrl5YWLiwskSTLcj6lUipmZGQYHBw0HBNDU1ITX6yUajQKwtLSEy+V6U/xkMoksy78KYwRFdReLxVBVFVmWDTvNZrPIskxVVZVh258YGRkhGo0yOztLTU0Nfr//TYvV1dXh8/mwWq1/2ba2tqJpWnHnQuifyD4KhSayj8S3/OH4lklb4P8xM51Of9klQiaTIZfLkU6nP+US4T/gisKZmsSBCQAAAABJRU5ErkJggg==",
+  "imageHeight": 20,
+  "imageWidth": 61
+}

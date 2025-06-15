@@ -7,6 +7,7 @@ from ultralytics import YOLO
 import sys
 import subprocess
 import shutil
+import yaml
 
 def setup_results_structure(filepath):
     """Create results folder structure for a new file"""
@@ -39,6 +40,12 @@ def check_poppler():
     except FileNotFoundError:
         return False
 
+def load_confidence_threshold():
+    config_path = os.path.join(os.path.dirname(__file__), '..', 'config.yaml')
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
+    return config.get('confidence_threshold', 0.5)
+
 def process_r1(filepath):
     """
     Stage 1: Process uploaded file (image/PDF) and run initial YOLO model
@@ -50,6 +57,8 @@ def process_r1(filepath):
     # Also save to original processing directory for pipeline compatibility
     output_dir = 'Falcon_r2_preprocess'
     os.makedirs(output_dir, exist_ok=True)
+    
+    confidence = load_confidence_threshold()
     
     try:
         # Determine if input is PDF or image
@@ -90,7 +99,7 @@ def process_r1(filepath):
         
         # Process each page/image
         for idx, img in enumerate(images):
-            results = model(img)
+            results = model(img, conf=confidence)
             
             for i, r in enumerate(results):
                 boxes = r.boxes
