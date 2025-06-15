@@ -106,7 +106,7 @@ In summary, our methodology is a hybrid approach that blends machine learning fo
 The system architecture for the proposed solution can be viewed as a pipeline of modular components, each responsible for a specific function in the overall process of tolerance extraction. illustrates the conceptual flow of data through the system, from input drawing to output report. The main components of the architecture include:
 \begin{figure}[h!]
 \centering
-\includegraphics[width=0.9\textwidth]{System Archi.png}
+\includegraphics[width=0.9\textwidth]{System Architecture.png}
 \caption{System architecture overview showing the flow from input drawing to extracted tolerance data. (This is a placeholder for a high-level flowchart or diagram.)}
 \label{fig:Arch_Flow}
 \end{figure}
@@ -259,7 +259,6 @@ During the development of this feasibility study, several constraints and challe
 
 \begin{itemize}
   \item \textbf{Limited Real Data:} A major constraint was the scarcity of real-world training data. We did not have access to a large repository of annotated engineering drawings to directly train our models. This led to the reliance on synthetic data, which, while useful, may not capture the full complexity of real drawings.
-  \item \textbf{Synthetic-Real Gap:} The synthetic images are idealized and may not include noise, variations in lighting or scanning artifacts that real images of drawings might have (e.g., smudges, pixelation, or rotated text). This difference means the models might face a drop in accuracy when exposed to actual drawing scans or PDFs.
   \item \textbf{Variety of Tolerance Types:} Geometric tolerances encompass a wide range of symbols and notations (flatness, straightness, roundness, parallelism, perpendicularity, angularity, position, concentricity, etc.). In this initial phase we only tackled a small subset. Extending to all types (and combinations, e.g., a position tolerance with certain material condition symbols) increases complexity.
   \item \textbf{Complex Layouts:} On a full drawing, tolerance information can appear in different contexts: in feature control frames next to the features, or in tabular form (like a tolerance table or notes section). Our current pipeline handles isolated annotation images but not the full-page layout problem. The detection of where these annotations are on a large drawing is an unsolved part (to be addressed with object detection).
   \item \textbf{OCR Accuracy:} OCR can be error-prone, especially with small font sizes or non-standard fonts. Tesseract might misread characters (e.g., interpreting “0.08” as “0.0B” or similar errors) if the image quality is not high. We mitigate this by preprocessing and restricting character set, but this is not foolproof. Moreover, Tesseract is not trained specifically on engineering fonts or symbols; for example, it might not recognize a diameter symbol Ø or other special characters if they appear.
