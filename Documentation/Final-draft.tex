@@ -416,54 +416,51 @@ By following these next steps, we aim to transition from a feasibility demo to a
 
 This chapter provides an overview of the quality assurance testing conducted to evaluate the effectiveness of the developed models. Testing was performed on two different blueprints provided by the customer, on which the models were initially trained.
 
-\subsection*{Category 1: Big Crop Model (Gear Drawings)}
+\subsection{Category 1: Big Crop Model (Gear Drawings)}
 \begin{itemize}
-\item \textbf{Sheet 1:} 7 out of 14 crops were successfully automatically cropped by the model.
-\item \textbf{Sheet 2:} 4 out of 5 crops were successfully automatically cropped by the model.
+  \item \textbf{Sheet 1:} 7 out of 14 crops were successfully automatically cropped by the model.
+  \item \textbf{Sheet 2:} 4 out of 5 crops were successfully automatically cropped by the model.
 \end{itemize}
 
-\subsection*{Category 2: Small Crop Model (Rectangle Shapes)}
+\subsection{Category 2: Small Crop Model (Rectangle Shapes)}
 \begin{itemize}
-\item \textbf{Sheet 1:} 31 out of 55 crops were successfully automatically cropped by the model.
-\item \textbf{Sheet 2:} 26 out of 32 crops were successfully automatically cropped by the model.
+  \item \textbf{Sheet 1:} 31 out of 55 crops were successfully automatically cropped by the model.
+  \item \textbf{Sheet 2:} 26 out of 32 crops were successfully automatically cropped by the model.
 \end{itemize}
 
-\subsection*{Category 3: Classification Model}
+\subsection{Category 3: Classification Model}
 \begin{itemize}
-\item Most symbols were classified as \textbf{None}, as no relevant symbols were present for extraction.
-\item The model exhibited a bias toward the \textbf{Location (Position)} class.
-\item This bias can be explained by the training data distribution, as the majority of labeled symbols in the training dataset belonged to the Location (Position) category. Therefore, the model tended to classify ambiguous or unknown symbols into this dominant class.
-\item To improve this, more diversified and balanced data across different classes are needed to prevent the model from overfitting to a single class.
+  \item Most symbols were classified as \textbf{None}, as no relevant symbols were present for extraction.
+  \item The model exhibited a bias toward the \textbf{Location (Position)} class.
 \end{itemize}
 
-\subsection*{Category 4: OCR Extraction Model}
-
+\subsection{Category 4: OCR Extraction Model}
 \begin{table}[h!]
 \centering
 \begin{tabular}{|l|c|c|}
 \hline
-\textbf{Evaluation Level} & \textbf{Sheet 1 Results} & \textbf{Sheet 2 Results} \
+\textbf{Evaluation Level} & \textbf{Sheet 1 Results} & \textbf{Sheet 2 Results} \\
 \hline
-Best & 1 out of 30 & 3 out of 46 \
-Good & 8 out of 31 & 13 out of 46 \
-Hallucinations/None & 19 out of 31 & 30 out of 46 \
+Best & 1 out of 30 & 3 out of 46 \\
+\hline
+Good & 8 out of 31 & 13 out of 46 \\
+\hline
+Hallucinations/None & 19 out of 31 & 30 out of 46 \\
 \hline
 \end{tabular}
 \caption{OCR Extraction Model Evaluation}
 \end{table}
 
-\section*{Summary}
+\subsection*{Summary}
+The conducted quality assurance tests demonstrate the varying performance of each model category. Notably, the cropping models performed reliably for specific shapes, with significant performance variations influenced by the number of gear drawings per blueprint. Specifically, Sheet 2 had fewer gear drawings than Sheet 1, which resulted in noticeably better cropping accuracy for both big and small crop models. This observation indicates that the density of gear drawings per blueprint directly influences the model's general cropping accuracy. Conversely, OCR extraction displayed a higher rate of misclassifications or omissions, highlighting the necessity for targeted improvements in this area. These insights will guide future enhancements and training to further optimize model accuracy and reliability.
 
-The conducted quality assurance tests demonstrate the varying performance of each model category. Notably, the cropping models performed reliably for specific shapes, with significant performance variations influenced by the number of gear drawings per blueprint. Specifically, Sheet 2 had fewer gear drawings than Sheet 1, which resulted in noticeably better cropping accuracy for both big and small crop models. This observation indicates that the density of gear drawings per blueprint directly influences the model's general cropping accuracy.
+Regarding the results of the classification model, most outputs were categorized as the 	extbf{None} class. This behavior can be explained by the fact that several symbols present in the test data were not included in the original training set. Furthermore, when classification did occur, it was predominantly into the 	extbf{Location (Position)} class. This trend indicates a clear model bias, likely stemming from an overrepresentation of this class in the training data.
 
-Regarding the classification model, most predictions were categorized as the \textbf{None} class, since several of the observed symbols were not included in the training data. Additionally, when classifications did occur, the model frequently defaulted to the \textbf{Location (Position)} category. This behavior is attributed to a bias in the training data, where the Location class was significantly overrepresented. To resolve this bias, a broader and more balanced dataset containing a variety of defined symbol classes is essential for improving the model’s accuracy and reliability.
-
-Conversely, OCR extraction displayed a higher rate of misclassifications or omissions, highlighting the necessity for targeted improvements in this area. These insights will guide future enhancements and training to further optimize model accuracy and robustness.
+To mitigate this issue, the training dataset must be expanded to include a broader variety of symbol classes. A more diverse dataset would help balance class representation and improve the model’s ability to generalize, thereby reducing the tendency to default to a dominant class such as 	extit{Location (Position)}.
 
 \section*{Analysis of Results}
 
 The number of gear drawings per blueprint substantially affects model performance. Sheet 2, containing fewer gear drawings, demonstrated higher accuracy in cropping compared to Sheet 1. This suggests a correlation between the complexity and density of gear drawings and the model’s accuracy, which should be considered in future model training and blueprint selection to maximize efficiency and accuracy.
-
 
 \section{Conclusion}
 In this feasibility study, we demonstrated the potential of a hybrid computer vision approach to automate the reading of geometric tolerances from engineering drawings. Through the use of a tolerance classification model and an OCR extraction pipeline, the system can interpret simplified representations of tolerance callouts. The project has laid the groundwork with synthetic data and initial models, and the results so far are encouraging. Moving forward, the focus will be on scaling up the solution to handle real drawings, more tolerance types, and integrating all components seamlessly. With continued development, this project could significantly streamline the feasibility analysis of designs at PSM Protech, saving time and reducing errors in the engineering process.
@@ -488,4 +485,3 @@ In this feasibility study, we demonstrated the potential of a hybrid computer vi
 
 \end{document}
 
- 
