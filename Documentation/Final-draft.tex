@@ -430,10 +430,9 @@ This chapter provides an overview of the quality assurance testing conducted to 
 
 \subsection{Category 3: Classification Model}
 \begin{itemize}
-  \item Most symbols were classified as \textbf{None}, as no relevant symbols were present for extraction.
-  \item The model exhibited a bias toward the \textbf{Location (Position)} class.
+  \item Most symbols were classified as \textbf{None}, since no matching labels were defined in the training set.
+  \item The model exhibited a bias toward the \textbf{Location (Position)} class, likely due to an imbalanced dataset.
 \end{itemize}
-
 \subsection{Category 4: OCR Extraction Model}
 \begin{table}[h!]
 \centering
@@ -443,14 +442,14 @@ This chapter provides an overview of the quality assurance testing conducted to 
 \hline
 Best & 1 out of 30 & 3 out of 46 \\
 \hline
-Good & 8 out of 31 & 13 out of 46 \\
+Good & 8 out of 30 & 13 out of 46 \\
 \hline
-Hallucinations/None & 19 out of 31 & 30 out of 46 \\
+Hallucinations/None & 21 out of 30 & 30 out of 46 \\
 \hline
 \end{tabular}
 \caption{OCR Extraction Model Evaluation}
+\label{tab:ocr_evaluation}
 \end{table}
-
 \subsection*{Summary}
 The conducted quality assurance tests demonstrate the varying performance of each model category. Notably, the cropping models performed reliably for specific shapes, with significant performance variations influenced by the number of gear drawings per blueprint. Specifically, Sheet 2 had fewer gear drawings than Sheet 1, which resulted in noticeably better cropping accuracy for both big and small crop models. This observation indicates that the density of gear drawings per blueprint directly influences the model's general cropping accuracy. Conversely, OCR extraction displayed a higher rate of misclassifications or omissions, highlighting the necessity for targeted improvements in this area. These insights will guide future enhancements and training to further optimize model accuracy and reliability.
 
