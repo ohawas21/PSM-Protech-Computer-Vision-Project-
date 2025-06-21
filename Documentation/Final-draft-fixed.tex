@@ -463,8 +463,99 @@ To mitigate this issue, the training dataset must be expanded to include a broad
 
 The number of gear drawings per blueprint substantially affects model performance. Sheet 2, containing fewer gear drawings, demonstrated higher accuracy in cropping compared to Sheet 1. This suggests a correlation between the complexity and density of gear drawings and the model’s accuracy, which should be considered in future model training and blueprint selection to maximize efficiency and accuracy.
 
+
 \section{Conclusion}
 In this feasibility study, we demonstrated the potential of a hybrid computer vision approach to automate the reading of geometric tolerances from engineering drawings. Through the use of a tolerance classification model and an OCR extraction pipeline, the system can interpret simplified representations of tolerance callouts. The project has laid the groundwork with synthetic data and initial models, and the results so far are encouraging. Moving forward, the focus will be on scaling up the solution to handle real drawings, more tolerance types, and integrating all components seamlessly. With continued development, this project could significantly streamline the feasibility analysis of designs at PSM Protech, saving time and reducing errors in the engineering process.
+
+\section{ Glossary of Technical Terms}
+
+\begin{description}
+
+  \item[AI (Artificial Intelligence)] A broad field of computer science focused on creating software or machines that perform tasks requiring human-like intelligence, such as decision-making, pattern recognition, and learning from data.
+
+  \item[API (Application Programming Interface)] A set of rules and protocols that allow different software applications to communicate and interact with each other.
+
+  \item[CI/CD (Continuous Integration/Continuous Deployment)] Practices that automate the building, testing, and deployment of code changes, allowing teams to integrate and deliver updates frequently and reliably.
+
+  \item[CSV (Comma-Separated Values)] A simple text file format where each line represents a row, and values in a row are separated by commas; commonly used for storing and exchanging tabular data.
+
+  \item[Camelot] An open-source Python library for automatically detecting and extracting tables from PDF documents into structured data formats.
+
+  \item[Computer Vision] A field of AI that enables computers to interpret and understand visual information from images or videos, such as detecting objects or reading text.
+
+  \item[Containerization] The process of packaging an application and its dependencies into a standardized unit (container) that can run consistently across different computing environments.
+
+  \item[Convolutional Neural Network (CNN)] A deep learning model with layered filters designed to automatically learn and recognize visual features in images, commonly used for tasks like classification and object detection.
+
+  \item[Deep Learning] A subset of machine learning that uses multi-layered neural networks to learn complex patterns from large datasets, enabling advanced tasks like image recognition and language understanding.
+
+  \item[DevOps] A set of practices combining software development and IT operations aimed at shortening development lifecycles and providing continuous delivery with high software quality.
+
+  \item[Docker] An open-source platform that uses containers—lightweight, self-contained environments—to package and run applications consistently across different systems.
+
+  \item[Dockerfile] A text file containing a series of instructions and commands to build a Docker image, specifying the environment setup and application dependencies.
+
+  \item[Donut (Document Understanding Transformer)] A transformer-based AI model designed to extract structured information directly from document images without requiring separate OCR steps.
+
+  \item[Falcon Models (r1–r4)] A family of deep learning model checkpoints used for various tasks; in this project, versions r1–r4 refer to successive model configurations applied for tasks like cropping and classification.
+
+  \item[Gaussian Blur] An image preprocessing technique applying a Gaussian function to an image to reduce noise and detail, often used before OCR to improve accuracy.
+
+  \item[GitLab] A web-based DevOps platform for source code management using Git, offering repository hosting, issue tracking, code review, and built-in CI/CD pipelines.
+
+  \item[GitLab CI/CD] GitLab's integrated continuous integration and continuous deployment system, which runs automated pipelines (build, test, deploy) defined in a project's repository.
+
+  \item[Jupyter Notebook] An interactive computing environment that allows users to combine live code, narrative text, visualizations, and other media in a single document for exploration and sharing.
+
+  \item[Kubernetes] An open-source system for automating the deployment, scaling, and management of containerized applications across clusters of machines.
+
+  \item[LLM (Large Language Model)] A type of deep learning model trained on vast text datasets that can generate and understand human-like text, used in tasks like translation, summarization, and question-answering.
+
+  \item[Logging] The practice of recording runtime events, errors, and informational messages from software into log files or consoles to help with debugging and monitoring.
+
+  \item[Nomad] An open-source scheduler and orchestrator for deploying and managing both containerized and non-containerized applications across a cluster.
+
+  \item[NumPy] A core Python library for numerical computing, providing efficient operations on large, multi-dimensional arrays and matrices.
+
+  \item[OCR (Optical Character Recognition)] Technology that converts images of text into editable digital text, enabling computers to 'read' scanned documents or photos of text.
+
+  \item[OpenCV] An open-source library for image processing and computer vision tasks, offering functions to transform, analyze, and manipulate images.
+
+  \item[PDF (Portable Document Format)] A file format developed by Adobe for presenting documents in a manner independent of application software, hardware, and operating systems; it can contain text, images, and vector graphics.
+
+  \item[PIL (Pillow)] A Python library (Pillow) for opening, manipulating, and saving many different image file formats.
+
+  \item[Pathlib] A Python standard library module for object-oriented filesystem path operations, providing classes and methods to handle filesystem paths.
+
+  \item[PyTesseract] A Python wrapper for the Tesseract OCR engine, allowing Python programs to access Tesseract's text-recognition capabilities.
+
+  \item[Regex (Regular Expression)] A syntax for defining search patterns to match, find, and replace text based on specific criteria.
+
+  \item[Semantic Versioning] A versioning scheme that uses a MAJOR.MINOR.PATCH format to communicate the nature of changes—such as bug fixes, backward-compatible improvements, or breaking changes.
+
+  \item[Tesseract (OCR Engine)] An open-source OCR engine maintained by Google that extracts text from images; often used via the PyTesseract Python interface.
+
+  \item[Vision Transformer (ViT)] A deep learning architecture that applies the Transformer model—originally developed for text—to image patches for tasks like classification.
+
+  \item[YOLO (You Only Look Once)] A fast, real-time object detection model that identifies and localizes multiple objects in an image with a single pass through the neural network.
+
+  \item[YOLOv11] A variant of the YOLO object detection architecture that supports oriented bounding-box detection for document structures, used in related research for extracting annotation regions.
+
+  \item[YOLOv8] The eighth version of the YOLO object detection architecture by Ultralytics, offering improvements in speed and accuracy over earlier versions.
+
+  \item[YOLOv8-CLS] A variant of YOLOv8 configured for classification tasks where the model predicts the class label of an input image rather than bounding boxes.
+
+  \item[YOLOv8-DET] A variant of YOLOv8 configured for object detection tasks, where the model identifies and draws bounding boxes around multiple objects in an image.
+
+  \item[eDOCr2] A hybrid framework combining OCR and tailored image-processing techniques to extract structured data (e.g., dimensions, tolerances) from engineering drawings.
+
+  \item[pandas] A high-level Python library for data manipulation and analysis, providing DataFrame structures similar to spreadsheets for handling tabular data.
+
+  \item[pdf2image] A Python library that converts PDF pages into PIL image objects, enabling image processing on PDF content.
+
+  \item[scikit-learn] A Python library offering tools for machine learning tasks such as classification, regression, clustering, and model evaluation.
+
+\end{description}
 
 
 \begin{thebibliography}{9}
