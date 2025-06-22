@@ -27,7 +27,7 @@
 \textbf{Abstract}
 \end{center}
 \noindent
-This document provides a comprehensive technical overview of the PSM Protech Feasibility Study project. The project aims to automate the extraction and analysis of geometric tolerances from engineering drawings using computer vision and machine learning techniques. It is intended to onboard new team members by explaining the project context, goals, methodology, system architecture, tools, models, data, constraints, current progress, results, and planned next steps. The document is structured as a reference guide for internal use, designed to be extended in future project phases.
+This document provides a comprehensive technical overview of the PSM Protech Feasibility Study project. The project aims to automate the extraction and analysis of geometric tolerances from engineering drawings using computer vision and machine learning techniques. It is intended to welcome new team members by explaining the context of the project, the goals, the methodology, the architecture of the system, the tools, the models, the data, the constraints, the current progress, the results, and theonstraints, the current progress, the results, and the planned next steps. The document is structured as a reference guide for internal use, designed to be extended in future project phases.
 
 \vfill
 \newpage
@@ -462,6 +462,63 @@ To mitigate this issue, the training dataset must be expanded to include a broad
 \section*{Analysis of Results}
 
 The number of gear drawings per blueprint substantially affects model performance. Sheet 2, containing fewer gear drawings, demonstrated higher accuracy in cropping compared to Sheet 1. This suggests a correlation between the complexity and density of gear drawings and the model’s accuracy, which should be considered in future model training and blueprint selection to maximize efficiency and accuracy.
+
+
+\section{System Establishment}
+
+This section outlines the requirements and setup procedure for deploying the project container using Docker.
+
+{System Requirements}
+\begin{itemize}
+    \item Minimum \textbf{15 GB RAM}.
+    \item Operating System: \textbf{Ubuntu}, \textbf{macOS}, or \textbf{Windows} (with Docker support).
+    \item \textbf{Access Credentials}: A Docker private registry token must be requested from the supervising professor.
+\end{itemize}
+
+{Docker Installation}
+Please refer to the official Docker installation guide corresponding to your operating system:
+
+\begin{center}
+\url{https://docs.docker.com/get-docker/}
+\end{center}
+
+\subsection{Docker Commands}
+
+Once Docker is installed and access credentials are obtained, execute the following commands:
+
+\begin{enumerate}
+    \item \textbf{Authenticate with the private Docker registry}:
+    \begin{verbatim}
+docker login <registry-url>
+    \end{verbatim}
+
+    \item \textbf{Pull the project image from the registry}:
+    \begin{verbatim}
+docker pull <registry-url>/<project-image-name>:<tag>
+    \end{verbatim}
+
+    \item \textbf{Run the Docker container in detached mode}:
+    \begin{verbatim}
+docker run -d \
+  --restart always \
+  -p 5001:5001 \
+  <registry-url>/<project-image-name>:<tag>
+    \end{verbatim}
+    \begin{itemize}
+        \item \texttt{-d}: Runs the container in detached mode (in the background).
+        \item \texttt{--restart always}: Ensures the container automatically restarts on system reboot.
+        \item \texttt{-p 5001:5001}: Maps port 5001 of the host to port 5001 in the container.
+    \end{itemize}
+\end{enumerate}
+
+{Accessing the Service}
+Once the container is running, the service will be accessible at:
+
+\begin{center}
+\texttt{http://<host-ip>:5001}
+\end{center}
+
+Note that the service will only be available within the internal network, unless configured otherwise. For persistent operation, it is recommended to deploy the service on a dedicated server with high availability and uptime.
 
 
 \section{Conclusion}
