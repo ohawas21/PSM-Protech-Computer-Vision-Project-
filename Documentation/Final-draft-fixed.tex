@@ -37,7 +37,7 @@ This document provides a comprehensive technical overview of the PSM Protech Fea
 \section{Initial Situation}
 PSM Protech is a leading manufacturer of high-precision mechanical components and assemblies serving the aerospace, medical, and industrial sectors. The company specializes in tight tolerance CNC machining, rapid prototyping, and comprehensive quality assurance to deliver complex parts with consistent accuracy and reliability.
 
-Mechanical engineering drawings are detailed technical plans that specify dimensions and tolerances for manufactured parts. Each drawing can contain hundreds of annotations that define the allowable variation in part geometry (known as GD\&T -- \emph{Geometric Dimensioning and Tolerancing} specifications). Traditionally, engineers at PSM Protech manually review these drawings to assess feasibility of production, a process that is time-consuming (2 weeks) and prone to human error. For example, Figure~\ref{fig:example_drawing} shows an engineering drawing of a mechanical part with numerous GD\&T callouts (tolerance symbols and values referencing datums). Manually checking up to 500 individual tolerance values in such a drawing, often across multiple design revisions, is tedious and carries the risk of overlooking critical requirements.
+Mechanical engineering drawings are detailed technical plans that specify dimensions and tolerances for manufactured parts. Each drawing can contain hundreds of annotations that define the allowable variation in part geometry (known as GD\&T -- \emph{Geometric Dimensioning and Tolerancing} specifications). Traditionally, engineers at PSM Protech manually review these drawings to assess feasibility of production, a process that is time-consuming (2 weeks) and prone to human error.  Manually checking up to 500 individual tolerance values in such a drawing, often across multiple design revisions, is tedious and carries the risk of overlooking critical requirements.
 
 \begin{figure}[h!]
 \centering
@@ -183,7 +183,7 @@ The tolerance classification model is based on the YOLOv8 architecture, configur
 
 In essence, the classification model learns to recognize different GD\&T symbols. For example, the flatness symbol (a parallelogram shape) looks very different from the cylindricity symbol (which appears as a circle or cylinder icon). By training on many examples of each, the CNN can reliably identify the type when shown a new instance. This classifier will be crucial when processing a full drawing: it will allow the system to know what kind of tolerance each detected annotation represents, which is necessary for any further reasoning (like understanding which tolerances are critical, or grouping similar types, etc.).
 
-\paragraph{Usage:} Once trained, using the model is straightforward. An input image (say, a cropped region from a drawing focusing on a tolerance frame) is passed to the model’s predict function, and it returns the predicted class label (and confidence). For instance, given an image of a symbol like in Figure~\ref{fig:synthetic_samples} (left), the model should output “flatness.” 
+\paragraph{Usage:} Once trained, using the model is straightforward. An input image (say, a cropped region from a drawing focusing on a tolerance frame) is passed to the model’s predict function, and it returns the predicted class label (and confidence). 
 
 % Insert figure of synthetic samples (flatness and cylindricity)
 \begin{figure}[h!]
@@ -433,6 +433,7 @@ This chapter provides an overview of the quality assurance testing conducted to 
   \item Most symbols were classified as \textbf{None}, since no matching labels were defined in the training set.
   \item The model exhibited a bias toward the \textbf{Location (Position)} class, likely due to an imbalanced dataset.
 \end{itemize}
+
 \subsection{Category 4: OCR Extraction Model}
 \begin{table}[h!]
 \centering
@@ -450,6 +451,7 @@ Hallucinations/None & 21 out of 30 & 30 out of 46 \\
 \caption{OCR Extraction Model Evaluation}
 \label{tab:ocr_evaluation}
 \end{table}
+
 \subsection*{Summary}
 The conducted quality assurance tests demonstrate the varying performance of each model category. Notably, the cropping models performed reliably for specific shapes, with significant performance variations influenced by the number of gear drawings per blueprint. Specifically, Sheet 2 had fewer gear drawings than Sheet 1, which resulted in noticeably better cropping accuracy for both big and small crop models. This observation indicates that the density of gear drawings per blueprint directly influences the model's general cropping accuracy. Conversely, OCR extraction displayed a higher rate of misclassifications or omissions, highlighting the necessity for targeted improvements in this area. These insights will guide future enhancements and training to further optimize model accuracy and reliability.
 
@@ -466,15 +468,13 @@ In this feasibility study, we demonstrated the potential of a hybrid computer vi
 
 
 \begin{thebibliography}{9}
-\begin{itemize}
-  \item A. Zheng, B. Smith, and C. Lee, “Hybrid Deep-Learning for Structured Extraction from Engineering Drawings,” \textit{Proceedings of the International Conference on Document Analysis and Recognition}, 2025.
-  \item B. Xu, D. Kumar, and E. Chen, “Tolerance Information Extraction from Mechanical Drawings using CNNs,” \textit{Journal of Computational Engineering}, vol. 12, no. 3, pp. 45–58, 2024.
-  \item F. Garcia et al., “eDOCr2: Enhanced Document OCR and Retrieval,” \textit{MDPI Journal of Data Science}, vol. 8, 2023.
-  \item M. Bakkopi, “engineering-drawing-extractor,” \texttt{https://github.com/bakkopi/engineering-drawing-extractor}, accessed May 2025.
-  \item Werk24 API Documentation, \url{https://werk24.com/api/docs}, accessed May 2025.
-  \item Infrrd AI Services, \url{https://www.infrrd.ai/services}, accessed May 2025.
-  \item Markovate AI Blueprint Reader, \url{https://www.markovate.com/blueprint-reader}, accessed May 2025.
-\end{itemize}
+  \bibitem{}item A. Zheng, B. Smith, and C. Lee, “Hybrid Deep-Learning for Structured Extraction from Engineering Drawings,” \textit{Proceedings of the International Conference on Document Analysis and Recognition}, 2025.
+  \bibitem B. Xu, D. Kumar, and E. Chen, “Tolerance Information Extraction from Mechanical Drawings using CNNs,” \textit{Journal of Computational Engineering}, vol. 12, no. 3, pp. 45–58, 2024.
+  \bibitem F. Garcia et al., “eDOCr2: Enhanced Document OCR and Retrieval,” \textit{MDPI Journal of Data Science}, vol. 8, 2023.
+  \bibitem M. Bakkopi, “engineering-drawing-extractor,” \texttt{https://github.com/bakkopi/engineering-drawing-extractor}, accessed May 2025.
+  \bibitem Werk24 API Documentation, \url{https://werk24.com/api/docs}, accessed May 2025.
+  \bibitem Infrrd AI Services, \url{https://www.infrrd.ai/services}, accessed May 2025.
+  \bibitem Markovate AI Blueprint Reader, \url{https://www.markovate.com/blueprint-reader}, accessed May 2025.
 \end{thebibliography}
 
 \vfill
