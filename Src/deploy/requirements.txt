@@ -15,4 +15,4 @@ gunicorn
 python-dotenv
 requests
 scikit-image
-matplotlib
+matplotlib==3.10.3
