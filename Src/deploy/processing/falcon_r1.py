@@ -40,10 +40,14 @@ def check_poppler():
     except FileNotFoundError:
         return False
 
-def load_confidence_threshold():
+def load_config():
     config_path = os.path.join(os.path.dirname(__file__), '..', 'config.yaml')
     with open(config_path, 'r') as f:
         config = yaml.safe_load(f)
+    return config
+
+def load_confidence_threshold():
+    config = load_config()
     return config.get('confidence_threshold', 0.5)
 
 def process_r1(filepath):
@@ -59,6 +63,10 @@ def process_r1(filepath):
     os.makedirs(output_dir, exist_ok=True)
     
     confidence = load_confidence_threshold()
+    config = load_config()
+    min_crop_size = config.get('min_crop_size', 10)
+    iou_threshold = config.get('iou_threshold', 0.5)
+    max_detections = config.get('max_detections', 1000)
     
     try:
         # Determine if input is PDF or image
@@ -99,17 +107,51 @@ def process_r1(filepath):
         
         # Process each page/image
         for idx, img in enumerate(images):
-            results = model(img, conf=confidence)
+            print(f"Processing image {idx+1}/{len(images)}, shape: {img.shape}")
+            results = model(img, conf=confidence, iou=iou_threshold, max_det=max_detections)
             
+            detections_found = 0
             for i, r in enumerate(results):
                 boxes = r.boxes
+                print(f"  Found {len(boxes)} detections with confidence >= {confidence}")
                 for j, box in enumerate(boxes):
                     # Get box coordinates
                     x1, y1, x2, y2 = box.xyxy[0]
                     x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
                     
+                    print(f"    Detection {j}: Original coords ({x1},{y1},{x2},{y2})")
+                    
+                    # Validate coordinates are within image bounds
+                    h, w = img.shape[:2]
+                    x1 = max(0, min(x1, w-1))
+                    y1 = max(0, min(y1, h-1))
+                    x2 = max(x1+1, min(x2, w))
+                    y2 = max(y1+1, min(y2, h))
+                    
+                    print(f"    Detection {j}: Adjusted coords ({x1},{y1},{x2},{y2}), image size ({w},{h})")
+                    
+                    # Ensure we have a valid crop region
+                    if x2 <= x1 or y2 <= y1:
+                        print(f"Warning: Invalid crop coordinates ({x1},{y1},{x2},{y2}), skipping")
+                        continue
+                    
+                    # Check minimum crop size
+                    crop_width = x2 - x1
+                    crop_height = y2 - y1
+                    if crop_width < min_crop_size or crop_height < min_crop_size:
+                        print(f"Warning: Crop too small ({crop_width}x{crop_height}), minimum is {min_crop_size}x{min_crop_size}, skipping")
+                        continue
+                    
                     # Crop the detected region
                     crop = img[y1:y2, x1:x2]
+                    
+                    # Validate crop is not empty
+                    if crop.size == 0:
+                        print(f"Warning: Empty crop for coordinates ({x1},{y1},{x2},{y2}), skipping")
+                        continue
+                    
+                    print(f"    Detection {j}: Crop shape {crop.shape}")
+                    detections_found += 1
                     
                     # Generate crop filename
                     crop_name = f'page{idx}_crop{i}_{j}.png'
@@ -122,7 +164,12 @@ def process_r1(filepath):
                     process_path = os.path.join(output_dir, crop_name)
                     cv2.imwrite(process_path, crop)
                     processed_paths.append(process_path)
+                    
+                    print(f"    Saved crop: {crop_name}")
+            
+            print(f"  Total valid detections for image {idx+1}: {detections_found}")
         
+        print(f"Total crops generated: {len(processed_paths)}")
         if not processed_paths:
             print("Warning: No objects detected in the input file")
         

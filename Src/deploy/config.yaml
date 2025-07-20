@@ -1,2 +1,12 @@
-# Configuration file for model thresholds and other settings
-confidence_threshold: 0.5
+
+confidence_threshold: 0.3
+
+iou_threshold: 0.5
+
+max_detections: 1000
+
+min_crop_size: 10
+
+enable_image_export: true
+
+export_images_dir: "export_images"

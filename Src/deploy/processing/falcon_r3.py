@@ -77,6 +77,8 @@ def process_r3(input_data):
         print("Warning: No input data received for classification")
         return []
         
+    print(f"R3 Processing: Received {len(input_data)} items for classification")
+    
     model_path = 'models/falcon_r3.pt'
     if not os.path.exists(model_path):
         raise FileNotFoundError(f"Model file not found: {model_path}")
@@ -84,20 +86,38 @@ def process_r3(input_data):
     try:
         classifier = ClassificationModel(model_path)
         results = []
+        classification_counts = {}
         
-        for item in input_data:
+        for i, item in enumerate(input_data):
+            if not isinstance(item, dict) or 'path' not in item:
+                print(f"Warning: Invalid item format at index {i}: {item}")
+                continue
+                
             if not os.path.exists(item['path']):
                 print(f"Warning: Image not found: {item['path']}")
                 continue
                 
             try:
+                print(f"  Classifying {i+1}/{len(input_data)}: {os.path.basename(item['path'])}")
                 class_name = classifier.predict(item['path'])
                 item['classified_class'] = class_name
                 results.append(item)
                 
+                # Count classifications
+                classification_counts[class_name] = classification_counts.get(class_name, 0) + 1
+                print(f"    → Classified as: {class_name}")
+                
             except Exception as e:
                 print(f"Warning: Failed to classify {item['path']}: {str(e)}")
+                # Still add the item but with unknown classification
+                item['classified_class'] = 'unknown'
+                results.append(item)
                 continue
+        
+        print(f"R3 Classification Summary:")
+        for class_name, count in classification_counts.items():
+            print(f"  {class_name}: {count} items")
+        print(f"Total classified items: {len(results)}")
         
         return results
         

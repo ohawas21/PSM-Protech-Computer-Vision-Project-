@@ -14,40 +14,61 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 10px;
+            padding: 15px;
             border: 1px solid #eee;
             margin-bottom: 10px;
-            border-radius: 5px;
+            border-radius: 8px;
+            background-color: #f9f9f9;
         }
-        .report-item span {
+        .report-info {
             flex-grow: 1;
+        }
+        .report-name {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .report-type {
+            font-size: 0.9em;
+            color: #666;
         }
         .report-item .btn-group {
             margin-left: 15px;
+        }
+        .file-icon {
+            font-size: 1.5em;
+            margin-right: 10px;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2 class="text-center mb-4">Available Reports</h2>
+        <h2 class="text-center mb-4">Available Downloads</h2>
         <div class="mb-3">
             <a href="{{ url_for('index') }}" class="btn btn-secondary">Back to Upload</a>
         </div>
         {% if reports %}
+            <div class="alert alert-info" role="alert">
+                <strong>📊 Excel Reports:</strong> Contain extracted data with embedded images<br>
+                <strong>🖼️ Image Archives:</strong> Contain organized folders with all processed images for verification
+            </div>
             <ul class="list-unstyled">
-                {% for report_name in reports %}
-                    <li class="report-item" id="report-item-{{ report_name.replace('.', '_') }}">
-                        <span>{{ report_name }}</span>
+                {% for report in reports %}
+                    <li class="report-item" id="report-item-{{ report.name.replace('.', '_') }}">
+                        <div class="file-icon">{{ report.icon }}</div>
+                        <div class="report-info">
+                            <div class="report-name">{{ report.name }}</div>
+                            <div class="report-type">{{ report.type }}</div>
+                        </div>
                         <div class="btn-group">
-                            <a href="{{ url_for('download_specific_file', filename=report_name) }}" class="btn btn-sm btn-success">Download</a>
-                            <button class="btn btn-sm btn-danger delete-report-btn" data-filename="{{ report_name }}">Delete</button>
+                            <a href="{{ url_for('download_specific_file', filename=report.name) }}" class="btn btn-sm btn-success">Download</a>
+                            <button class="btn btn-sm btn-danger delete-report-btn" data-filename="{{ report.name }}">Delete</button>
                         </div>
                     </li>
                 {% endfor %}
             </ul>
         {% else %}
             <div class="alert alert-info" role="alert">
-                No reports found in the 'outputs' directory.
+                No files found in the 'outputs' directory.
             </div>
         {% endif %}
     </div>

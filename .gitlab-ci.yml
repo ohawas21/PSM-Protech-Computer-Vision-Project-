@@ -1,42 +1,53 @@
 stages:
-  - Git Access
-  - Model Check
-  - Build Whole Model
-  - model_processing
-  - test
-  - deploy
-  - build_docs
+  - software_precheck
+  - software_build
+  - software_deploy
+  - documentation
 
 variables:
-  GITHUB_USER: vaikundamanimugesh
-  IMAGE_NAME: ghcr.io/$GITHUB_USER/psmprotech_mvp
-  IMAGE_TAG: main                        # ← force all images to use “:main”
+  # Registry configuration
+  REGISTRY_URL: registry-ce.th-rosenheim.de
+
+  # Image naming
+  IMAGE_NAME: $REGISTRY_URL/pse-aai-25/pixmind_psm
+  IMAGE_TAG: main
   FULL_IMAGE_NAME: $IMAGE_NAME:$IMAGE_TAG
 
+  # Credentials (define these in Project Settings → CI/CD → Variables)
+  DOCKER_USER: $DOCKER_USER      # e.g. deploy token or service account
+  DOCKER_PASS: $DOCKER_PASS      # corresponding password or token
+
 # -------------------------------------------
-# STAGE 1: GIT ACCESS
+# STAGE 1: SOFTWARE PRECHECK
 # -------------------------------------------
-check_git_access:
-  stage: Git Access
-  image: alpine:latest
+git_repository_status:
+  stage: software_precheck
+  image: docker:20.10.16
+  services:
+    - docker:20.10.16-dind
+  variables:
+    DOCKER_TLS_CERTDIR: ""
   script:
-    - apk add --no-cache git
+    - apk add --no-cache git curl
     - echo "🔍 Verifying Git repository..."
     - git status
     - git rev-parse --abbrev-ref HEAD
 
-# -------------------------------------------
-# STAGE 2: MODEL FOLDER CHECKS (MATRIX)
-# -------------------------------------------
-.check_model_template: &check_model_template
-  stage: Model Check
+    - echo "🔐 Checking Docker registry login..."
+    - echo "$DOCKER_PASS" | docker login "$REGISTRY_URL" -u "$DOCKER_USER" --password-stdin
+
+    - echo "🔄 Pinging Docker registry endpoint..."
+    - curl -s -o /dev/null -w "%{http_code}" https://$REGISTRY_URL/v2/ || true
+
+.model_check_template: &model_check_template
+  stage: software_precheck
   image: alpine:latest
-  needs: [check_git_access]
+  needs: [git_repository_status]
   script:
     - test -d "Src/Model/${FALCON_DIR}" && echo "✅ ${FALCON_DIR} OK" || (echo "❌ ${FALCON_DIR} missing" && exit 1)
 
 check_model_folders:
-  <<: *check_model_template
+  <<: *model_check_template
   parallel:
     matrix:
       - FALCON_DIR: "falcon_r1"
@@ -45,10 +56,10 @@ check_model_folders:
       - FALCON_DIR: "falcon_r4"
 
 # -------------------------------------------
-# STAGE 3: BUILD & PUSH DOCKER IMAGE
+# STAGE 2: SOFTWARE BUILD
 # -------------------------------------------
-build_application_image:
-  stage: Build Whole Model
+software_build:
+  stage: software_build
   image: docker:20.10.16
   services:
     - docker:20.10.16-dind
@@ -57,9 +68,9 @@ build_application_image:
   needs:
     - check_model_folders
   before_script:
-    - echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_USER" --password-stdin
+    - echo "$DOCKER_PASS" | docker login "$REGISTRY_URL" -u "$DOCKER_USER" --password-stdin
   script:
-    - echo "📦 Validating .pt files..."
+    - echo "📦 Validating model artifacts (.pt files)..."
     - |
       for i in 1 2 3; do
         if [ ! -f "Src/deploy/models/falcon_r${i}.pt" ]; then
@@ -69,78 +80,49 @@ build_application_image:
       done
     - docker build -t "$FULL_IMAGE_NAME" -f Src/deploy/Dockerfile Src/deploy
     - docker push "$FULL_IMAGE_NAME"
+    - echo "🔍 Post-build Git status for traceability:"
+    - git status
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
       when: always
     - when: never
 
 # -------------------------------------------
-# STAGE 4: MODEL PROCESSING
+# STAGE 3: SOFTWARE DEPLOY
 # -------------------------------------------
-model_processing:
-  stage: model_processing
-  image: python:3.9-alpine
-  needs:
-    - build_application_image
-  script:
-    - echo "🔄 Running model processing..."
-    # – your actual commands here –
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
-      when: always
-    - when: never
-
-# -------------------------------------------
-# STAGE 5: TEST
-# -------------------------------------------
-application_tests:
-  stage: test
-  image: python:3.9
-  needs:
-    - model_processing
-  script:
-    - echo "🧪 Running application-level tests..."
-    # – your test commands here –
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
-      when: always
-    - when: never
-
-# -------------------------------------------
-# STAGE 6: DEPLOY
-# -------------------------------------------
-deploy_application:
-  stage: deploy
+software_deploy:
+  stage: software_deploy
   image: docker:20.10.16
   services:
     - docker:20.10.16-dind
   needs:
-    - application_tests
+    - software_build
   before_script:
-    - echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_USER" --password-stdin
+    - echo "$DOCKER_PASS" | docker login "$REGISTRY_URL" -u "$DOCKER_USER" --password-stdin
   script:
-    - echo "🚀 Deploying application container..."
-    # – e.g., docker push $FULL_IMAGE_NAME or helm upgrade ––
+    - echo "🚀 Deploying pixmind_psm container..."
+    - docker pull "$FULL_IMAGE_NAME"
+    # Insert your `docker run` or `helm upgrade` commands here
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
       when: always
     - when: never
 
 # -------------------------------------------
-# STAGE 7: BUILD DOCS
+# STAGE 4: DOCUMENTATION
 # -------------------------------------------
 build_documentation:
-  stage: build_docs
+  stage: documentation
   image: danteev/texlive
+  needs:
+    - software_deploy
   script:
     - |
       if [ -d "Documentation" ]; then
         cd Documentation
         echo "📚 Building LaTeX documentation..."
         for file in *.tex; do
-          if [ -f "$file" ]; then
-            latexmk -pdf "$file"
-          fi
+          latexmk -pdf "$file"
         done
       else
         echo "⚠️ Documentation folder not found."
@@ -150,5 +132,3 @@ build_documentation:
       - Documentation/*.pdf
     expire_in: 1 week
     when: always
-  needs: [deploy_application]
-
