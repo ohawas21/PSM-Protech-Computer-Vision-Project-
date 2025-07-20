@@ -28,8 +28,6 @@ software_build:
     - docker build -t "$FULL_IMAGE" -f Src/deploy/Dockerfile Src/deploy
     - echo "🚀 Pushing Docker image..."
     - docker push "$FULL_IMAGE"
-    - echo "🔍 Post-build Git status:"
-    - git status
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
       when: always
@@ -49,7 +47,6 @@ software_deploy:
   script:
     - echo "🔄 Pulling and restarting the container..."
     - docker pull "$FULL_IMAGE"
-    # Uncomment & adjust to actually run:
     # - docker stop pixmind_psm || true
     # - docker rm   pixmind_psm || true
     # - docker run -d --name pixmind_psm -p 5001:5001 "$FULL_IMAGE"
