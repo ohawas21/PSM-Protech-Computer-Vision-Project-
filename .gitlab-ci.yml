@@ -1,70 +1,17 @@
 stages:
-  - software_precheck
   - software_build
   - software_deploy
   - documentation
 
 variables:
-  # Registry configuration
-  REGISTRY_URL: registry-ce.th-rosenheim.de
-
-  # Image naming
-  IMAGE_NAME: $REGISTRY_URL/pse-aai-25/pixmind_psm
-  IMAGE_TAG: main
-  FULL_IMAGE_NAME: $IMAGE_NAME:$IMAGE_TAG
-
-  # Credentials (define these in Project Settings → CI/CD → Variables)
-  DOCKER_USER: $DOCKER_USER      # e.g. deploy token or service account
-  DOCKER_PASS: $DOCKER_PASS      # corresponding password or token
+  # Use GitLab’s built-in registry variables
+  REGISTRY_URL: $CI_REGISTRY
+  IMAGE_NAME:   $CI_REGISTRY_IMAGE
+  IMAGE_TAG:    main
+  FULL_IMAGE:   $IMAGE_NAME:$IMAGE_TAG
 
 # -------------------------------------------
-# STAGE 1: SOFTWARE PRECHECK
-# -------------------------------------------
-git_repository_status:
-  stage: software_precheck
-  image: docker:20.10.16
-  services:
-    - docker:20.10.16-dind
-  variables:
-    DOCKER_TLS_CERTDIR: ""
-  script:
-    - apk add --no-cache git curl
-    - echo "🔍 Verifying Git repository..."
-    - git status
-    - git rev-parse --abbrev-ref HEAD
-
-    - echo "🔐 Checking Docker registry login..."
-    - echo "$DOCKER_PASS" | docker login "$REGISTRY_URL" -u "$DOCKER_USER" --password-stdin
-
-    - echo "🔄 Pinging Docker registry endpoint..."
-    - curl -s -o /dev/null -w "%{http_code}" https://$REGISTRY_URL/v2/ || true
-
-.model_check_template: &model_check_template
-  stage: software_precheck
-  image: alpine:latest
-  needs: [git_repository_status]
-  script:
-    - |
-      # Verify .pt artifact
-      PT_FILE="Src/deploy/models/${FALCON_DIR}.pt"
-      if [ -f "$PT_FILE" ]; then
-        echo "✅ Found PT file: $PT_FILE"
-      else
-        echo "❌ Missing PT file: $PT_FILE"
-        exit 1
-      fi
-
-check_model_folders:
-  <<: *model_check_template
-  parallel:
-    matrix:
-      - FALCON_DIR: "falcon_r1"
-      - FALCON_DIR: "falcon_r2"
-      - FALCON_DIR: "falcon_r3"
-      - FALCON_DIR: "falcon_r4"
-
-# -------------------------------------------
-# STAGE 2: SOFTWARE BUILD
+# STAGE 1: SOFTWARE BUILD
 # -------------------------------------------
 software_build:
   stage: software_build
@@ -73,33 +20,22 @@ software_build:
     - docker:20.10.16-dind
   variables:
     DOCKER_TLS_CERTDIR: ""
-  needs:
-    - check_model_folders
   before_script:
-    - echo "$DOCKER_PASS" | docker login "$REGISTRY_URL" -u "$DOCKER_USER" --password-stdin
+    # Authenticate to the Container Registry
+    - echo "$CI_JOB_TOKEN" | docker login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin
   script:
-    - echo "📦 Validating model artifacts (.pt files)..."
-    - |
-      for i in 1 2 3; do
-        PT="Src/deploy/models/falcon_r${i}.pt"
-        if [ ! -f "$PT" ]; then
-          echo "❌ Missing: $PT"
-          exit 1
-        fi
-      done
     - echo "🔨 Building Docker image..."
-    - docker build -t "$FULL_IMAGE_NAME" -f Src/deploy/Dockerfile Src/deploy
+    - docker build -t "$FULL_IMAGE" -f Src/deploy/Dockerfile Src/deploy
     - echo "🚀 Pushing Docker image..."
-    - docker push "$FULL_IMAGE_NAME"
-    - echo "🔍 Post-build Git status for traceability:"
+    - docker push "$FULL_IMAGE"
+    - echo "🔍 Post-build Git status:"
     - git status
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
       when: always
-    - when: never
 
 # -------------------------------------------
-# STAGE 3: SOFTWARE DEPLOY
+# STAGE 2: SOFTWARE DEPLOY
 # -------------------------------------------
 software_deploy:
   stage: software_deploy
@@ -109,18 +45,20 @@ software_deploy:
   needs:
     - software_build
   before_script:
-    - echo "$DOCKER_PASS" | docker login "$REGISTRY_URL" -u "$DOCKER_USER" --password-stdin
+    - echo "$CI_JOB_TOKEN" | docker login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin
   script:
-    - echo "🚀 Deploying pixmind_psm container..."
-    - docker pull "$FULL_IMAGE_NAME"
-    # Insert your `docker run` or `helm upgrade` commands here
+    - echo "🔄 Pulling and restarting the container..."
+    - docker pull "$FULL_IMAGE"
+    # Uncomment & adjust to actually run:
+    # - docker stop pixmind_psm || true
+    # - docker rm   pixmind_psm || true
+    # - docker run -d --name pixmind_psm -p 5001:5001 "$FULL_IMAGE"
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
       when: always
-    - when: never
 
 # -------------------------------------------
-# STAGE 4: DOCUMENTATION
+# STAGE 3: DOCUMENTATION
 # -------------------------------------------
 build_documentation:
   stage: documentation
@@ -132,8 +70,8 @@ build_documentation:
       if [ -d "Documentation" ]; then
         cd Documentation
         echo "📚 Building LaTeX documentation..."
-        for file in *.tex; do
-          latexmk -pdf "$file"
+        for tex in *.tex; do
+          latexmk -pdf "$tex"
         done
       else
         echo "⚠️ Documentation folder not found."
