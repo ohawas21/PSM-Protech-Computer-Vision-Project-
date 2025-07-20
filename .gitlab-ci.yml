@@ -5,34 +5,54 @@ stages:
   - documentation
 
 variables:
-  # Use GitLab’s built-in registry variables
-  REGISTRY_URL: $CI_REGISTRY
-  IMAGE_NAME:   $CI_REGISTRY_IMAGE
-  IMAGE_TAG:    main
-  FULL_IMAGE:   $IMAGE_NAME:$IMAGE_TAG
+  # Registry configuration
+  REGISTRY_URL: registry-ce.th-rosenheim.de
+
+  # Image naming
+  IMAGE_NAME: $REGISTRY_URL/pse-aai-25/pixmind_psm
+  IMAGE_TAG: main
+  FULL_IMAGE_NAME: $IMAGE_NAME:$IMAGE_TAG
+
+  # Credentials (define these in Project Settings → CI/CD → Variables)
+  DOCKER_USER: $DOCKER_USER      # e.g. deploy token or service account
+  DOCKER_PASS: $DOCKER_PASS      # corresponding password or token
 
 # -------------------------------------------
 # STAGE 1: SOFTWARE PRECHECK
 # -------------------------------------------
 git_repository_status:
   stage: software_precheck
-  image: alpine:latest
+  image: docker:20.10.16
+  services:
+    - docker:20.10.16-dind
+  variables:
+    DOCKER_TLS_CERTDIR: ""
   script:
     - apk add --no-cache git curl
     - echo "🔍 Verifying Git repository..."
     - git status
     - git rev-parse --abbrev-ref HEAD
-    - echo "🔄 Checking registry API..."
-    - curl -fsSL -o /dev/null -w "%{http_code}" "$REGISTRY_URL/v2/" || true
+
+    - echo "🔐 Checking Docker registry login..."
+    - echo "$DOCKER_PASS" | docker login "$REGISTRY_URL" -u "$DOCKER_USER" --password-stdin
+
+    - echo "🔄 Pinging Docker registry endpoint..."
+    - curl -s -o /dev/null -w "%{http_code}" https://$REGISTRY_URL/v2/ || true
 
 .model_check_template: &model_check_template
   stage: software_precheck
   image: alpine:latest
   needs: [git_repository_status]
   script:
-    - test -d "Src/Model/${FALCON_DIR}" \
-      && echo "✅ ${FALCON_DIR} folder exists" \
-      || (echo "❌ ${FALCON_DIR} missing" && exit 1)
+    - |
+      # Verify .pt artifact
+      PT_FILE="Src/deploy/models/${FALCON_DIR}.pt"
+      if [ -f "$PT_FILE" ]; then
+        echo "✅ Found PT file: $PT_FILE"
+      else
+        echo "❌ Missing PT file: $PT_FILE"
+        exit 1
+      fi
 
 check_model_folders:
   <<: *model_check_template
@@ -56,19 +76,22 @@ software_build:
   needs:
     - check_model_folders
   before_script:
-    - echo "$CI_JOB_TOKEN" | docker login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin
+    - echo "$DOCKER_PASS" | docker login "$REGISTRY_URL" -u "$DOCKER_USER" --password-stdin
   script:
-    - echo "📦 Validating model artifacts..."
+    - echo "📦 Validating model artifacts (.pt files)..."
     - |
       for i in 1 2 3; do
-        [ -f "Src/deploy/models/falcon_r${i}.pt" ] \
-          || { echo "❌ Src/deploy/models/falcon_r${i}.pt missing"; exit 1; }
+        PT="Src/deploy/models/falcon_r${i}.pt"
+        if [ ! -f "$PT" ]; then
+          echo "❌ Missing: $PT"
+          exit 1
+        fi
       done
     - echo "🔨 Building Docker image..."
-    - docker build -t "$FULL_IMAGE" -f Src/deploy/Dockerfile Src/deploy
+    - docker build -t "$FULL_IMAGE_NAME" -f Src/deploy/Dockerfile Src/deploy
     - echo "🚀 Pushing Docker image..."
-    - docker push "$FULL_IMAGE"
-    - echo "🔍 Post-build Git status:"
+    - docker push "$FULL_IMAGE_NAME"
+    - echo "🔍 Post-build Git status for traceability:"
     - git status
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
@@ -86,14 +109,11 @@ software_deploy:
   needs:
     - software_build
   before_script:
-    - echo "$CI_JOB_TOKEN" | docker login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin
+    - echo "$DOCKER_PASS" | docker login "$REGISTRY_URL" -u "$DOCKER_USER" --password-stdin
   script:
-    - echo "🔄 Pulling and deploying Docker image on host..."
-    - docker pull "$FULL_IMAGE"
-    # Insert your deploy commands below, e.g.:
-    # - docker stop pixmind_psm || true
-    # - docker rm pixmind_psm   || true
-    # - docker run -d --name pixmind_psm -p 5001:5001 "$FULL_IMAGE"
+    - echo "🚀 Deploying pixmind_psm container..."
+    - docker pull "$FULL_IMAGE_NAME"
+    # Insert your `docker run` or `helm upgrade` commands here
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
       when: always
@@ -112,8 +132,8 @@ build_documentation:
       if [ -d "Documentation" ]; then
         cd Documentation
         echo "📚 Building LaTeX documentation..."
-        for f in *.tex; do
-          latexmk -pdf "$f"
+        for file in *.tex; do
+          latexmk -pdf "$file"
         done
       else
         echo "⚠️ Documentation folder not found."
